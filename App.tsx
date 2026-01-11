@@ -1,41 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import { View, Modal } from 'react-native';
-import * as Linking from 'expo-linking';
+import React from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ShareIntentProvider } from './src/providers/ShareIntentProvider';
+import { ShareIntentModal } from './src/components/ShareIntentModal';
+import { FeedScreen } from './src/screens/FeedScreen';
 import { initDb } from './src/db';
-import { CaptureModal } from './src/screens/CaptureModal';
-import { Feed } from './src/screens/Feed';
-import { Settings } from './src/screens/Settings';
+
+// Ensure DB is ready
+initDb();
 
 export default function App() {
-  const [sharedUrl, setSharedUrl] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
-
-  useEffect(() => {
-    initDb();
-
-    const sub = Linking.addEventListener('url', ({ url }) => {
-      if (url) setSharedUrl(url);
-    });
-
-    return () => sub.remove();
-  }, []);
-
   return (
-    <View style={{ flex: 1 }}>
-      {showSettings ? (
-        <Settings onClose={() => setShowSettings(false)} />
-      ) : (
-        <Feed onOpenSettings={() => setShowSettings(true)} />
-      )}
-
-      <Modal visible={!!sharedUrl} animationType="slide">
-        {sharedUrl && (
-          <CaptureModal
-            instagramUrl={sharedUrl}
-            onClose={() => setSharedUrl(null)}
-          />
-        )}
-      </Modal>
-    </View>
+    <SafeAreaProvider>
+      <ShareIntentProvider>
+        <FeedScreen />
+        {/* The modal is rendered globally if an intent exists */}
+        <ShareIntentModal />
+      </ShareIntentProvider>
+    </SafeAreaProvider>
   );
 }
