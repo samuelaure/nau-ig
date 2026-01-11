@@ -1,52 +1,61 @@
 import { db } from '../db';
 
+export interface MediaItem {
+  type: 'image' | 'video';
+  url: string;
+  localUri?: string;
+}
+
 export interface Post {
-  id?: number;
+  id: number;
   instagramUrl: string;
   title?: string;
   content?: string;
-  tags?: string[];
-  frequency?: 'high' | 'medium' | 'low';
-  createdAt?: string;
+  tags?: string;
+  mediaData?: string; // JSON
+  sm2_interval: number;
+  sm2_ease_factor: number;
+  sm2_repetition: number;
 }
 
 /**
- * Maps User-selected frequency to SM-2 initial Interval
+ * Fetches posts that are due for review based on SM-2.
  */
-const getInitialInterval = (frequency: string = 'medium') => {
-  switch (frequency) {
-    case 'high':
-      return 1; // Review tomorrow
-    case 'low':
-      return 7; // Review in a week
-    default:
-      return 3; // Review in 3 days
-  }
-};
-
-export const savePost = (post: Post): Promise<number> => {
-  const initialInterval = getInitialInterval(post.frequency);
-
+export const getDuePosts = (): Promise<Post[]> => {
   return new Promise((resolve, reject) => {
     db.transaction((tx) => {
       tx.executeSql(
-        `INSERT INTO posts (
-          instagramUrl, title, content, tags, frequency, 
-          sm2_interval, next_review_at
-        ) VALUES (?, ?, ?, ?, ?, ?, datetime('now', '+${initialInterval} days'))`,
-        [
-          post.instagramUrl,
-          post.title || null,
-          post.content || null,
-          post.tags ? JSON.stringify(post.tags) : null,
-          post.frequency || 'medium',
-          initialInterval
-        ],
+        `SELECT * FROM posts WHERE next_review_at <= datetime('now') OR next_review_at IS NULL ORDER BY next_review_at ASC`,
+        [],
+        (_, { rows }) => resolve(rows._array),
+        (_, err) => { reject(err); return false; }
+      );
+    });
+  });
+};
+
+export const updatePostMedia = (id: number, mediaData: MediaItem[]): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction((tx) => {
+      tx.executeSql(
+        `UPDATE posts SET mediaData = ?, isProcessed = 1 WHERE id = ?`,
+        [JSON.stringify(mediaData), id],
+        () => resolve(),
+        (_, err) => { reject(err); return false; }
+      );
+    });
+  });
+};
+
+export const savePost = (post: any): Promise<number> => {
+  return new Promise((resolve, reject) => {
+    db.transaction((tx) => {
+      tx.executeSql(
+        `INSERT INTO posts (instagramUrl, title, content, tags, frequency, sm2_interval, next_review_at) 
+         VALUES (?, ?, ?, ?, ?, 1, datetime('now'))`,
+        [post.instagramUrl, post.title, post.content, JSON.stringify(post.tags), post.frequency],
         (_, result) => resolve(result.insertId || 0),
-        (_, error) => {
-          reject(error);
-          return false;
-        }
+        (_, error) => { reject(error); return false; }
       );
     });
   });

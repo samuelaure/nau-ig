@@ -2,13 +2,9 @@ import * as SQLite from 'expo-sqlite';
 
 export const db = SQLite.openDatabase('nau_ig.db');
 
-/**
- * Ensures all tables exist with correct schemas.
- * Following PRD Section 19.7 for Data Models.
- */
 export const initDb = () => {
   db.transaction((tx) => {
-    // Posts Table with SM-2 Spaced Repetition fields
+    // Enhanced Posts table with media metadata and processing status
     tx.executeSql(`
       CREATE TABLE IF NOT EXISTS posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -17,6 +13,8 @@ export const initDb = () => {
         content TEXT,
         tags TEXT,
         frequency TEXT,
+        mediaData TEXT, -- JSON array of { type: 'image'|'video', url: string, localUri: string }
+        isProcessed INTEGER DEFAULT 0,
         sm2_interval INTEGER DEFAULT 1,
         sm2_repetition INTEGER DEFAULT 0,
         sm2_ease_factor REAL DEFAULT 2.5,
@@ -25,7 +23,6 @@ export const initDb = () => {
       );
     `);
 
-    // Key-Value settings store (Webhook URLs, User Preferences)
     tx.executeSql(`
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,

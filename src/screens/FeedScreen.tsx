@@ -1,59 +1,93 @@
-import React from 'react';
-import { View, Text, StyleSheet, StatusBar } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, FlatList, RefreshControl, Text, SafeAreaView } from 'react-native';
+import { FeedItem } from '../components/FeedItem';
+import { getDuePosts, Post } from '../repositories/PostRepository';
 
-/**
- * FeedScreen - The primary interaction layer for 9naŭ IG.
- * Displays content following the SM-2 algorithm to ensure
- * internalization of captured posts.
- */
 export const FeedScreen = () => {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadFeed = useCallback(async () => {
+    try {
+      const data = await getDuePosts();
+      setPosts(data);
+    } catch (error) {
+      console.error('Failed to load feed:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFeed();
+  }, [loadFeed]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadFeed();
+    setRefreshing(false);
+  };
+
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-      <View style={styles.content}>
-        <Text style={styles.title}>9naŭ IG</Text>
-        <Text style={styles.subtitle}>
-          Your intentional feed will appear here.
-        </Text>
-        <Text style={styles.hint}>
-          Try sharing a post from Instagram to get started.
-        </Text>
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.container}>
+        <View style={styles.topBar}>
+          <Text style={styles.logo}>9naŭ IG</Text>
+        </View>
+        <FlatList
+          data={posts}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => <FeedItem post={item} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={styles.emptyText}>Nothing due for review yet.</Text>
+              <Text style={styles.emptySubText}>Capture posts from Instagram to start your habit.</Text>
+            </View>
+          }
+          showsVerticalScrollIndicator={false}
+        />
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#fff'
   },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#000',
-    marginBottom: 8
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20
-  },
-  hint: {
-    fontSize: 14,
-    color: '#3b82f6',
-    fontWeight: '600',
-    textAlign: 'center',
-    backgroundColor: '#eff6ff',
+  topBar: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20
-  }
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  logo: {
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -1,
+    color: '#000',
+  },
+  empty: {
+    flex: 1,
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 100,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 8,
+  },
 });
