@@ -9,6 +9,8 @@ export function initDb() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         instagramUrl TEXT NOT NULL,
         note TEXT,
+        mediaUrl TEXT,
+        mediaType TEXT,
         createdAt INTEGER NOT NULL
       );
     `);
@@ -19,6 +21,13 @@ export function initDb() {
         interval INTEGER NOT NULL,
         nextDueAt INTEGER NOT NULL,
         lastInteractionAt INTEGER NOT NULL
+      );
+    `);
+
+    tx.executeSql(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
       );
     `);
   });
