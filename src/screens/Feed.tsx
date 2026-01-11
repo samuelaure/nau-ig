@@ -18,11 +18,7 @@ interface Item {
   interval: number;
 }
 
-export function Feed({
-  onOpenSettings
-}: {
-  onOpenSettings: () => void;
-}) {
+export function Feed({ onOpenSettings }: { onOpenSettings: () => void }) {
   const [items, setItems] = useState<Item[]>([]);
 
   const load = () => {
@@ -43,7 +39,11 @@ export function Feed({
 
   useEffect(load, []);
 
-  const act = (id: number, interval: number, action: 'less' | 'same' | 'more') => {
+  const act = (
+    id: number,
+    interval: number,
+    action: 'less' | 'same' | 'more'
+  ) => {
     const rep = adjustRepetition(interval, action);
     db.transaction((tx) => {
       tx.executeSql(
@@ -70,9 +70,18 @@ export function Feed({
             {i.note ? <Text style={styles.note}>{i.note}</Text> : null}
 
             <View style={styles.actions}>
-              <Button title="Less" onPress={() => act(i.id, i.interval, 'less')} />
-              <Button title="Same" onPress={() => act(i.id, i.interval, 'same')} />
-              <Button title="More" onPress={() => act(i.id, i.interval, 'more')} />
+              <Button
+                title="Less"
+                onPress={() => act(i.id, i.interval, 'less')}
+              />
+              <Button
+                title="Same"
+                onPress={() => act(i.id, i.interval, 'same')}
+              />
+              <Button
+                title="More"
+                onPress={() => act(i.id, i.interval, 'more')}
+              />
             </View>
           </View>
         ))}

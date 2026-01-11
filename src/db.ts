@@ -1,9 +1,9 @@
-import * as SQLite from "expo-sqlite";
+import * as SQLite from 'expo-sqlite';
 
-export const db = SQLite.openDatabase("nau.db");
+export const db = SQLite.openDatabase('nau.db');
 
 export function initDb() {
-  db.transaction(tx => {
+  db.transaction((tx) => {
     tx.executeSql(`
       CREATE TABLE IF NOT EXISTS posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

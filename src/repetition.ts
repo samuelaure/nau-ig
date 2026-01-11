@@ -11,12 +11,12 @@ export function initialRepetition() {
 
 export function adjustRepetition(
   interval: number,
-  action: "more" | "same" | "less"
+  action: 'more' | 'same' | 'less'
 ) {
   let newInterval = interval;
 
-  if (action === "more") newInterval = Math.min(interval * 2, 60);
-  if (action === "less") newInterval = Math.max(Math.floor(interval / 2), 1);
+  if (action === 'more') newInterval = Math.min(interval * 2, 60);
+  if (action === 'less') newInterval = Math.max(Math.floor(interval / 2), 1);
 
   const now = Date.now();
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,11 @@ import {
   Button,
   StyleSheet,
   ActivityIndicator
-} from "react-native";
-import { db } from "../db";
-import { initialRepetition } from "../repetition";
-import { getSetting } from "../storage/settings";
-import { sendToMake } from "../services/make";
+} from 'react-native';
+import { db } from '../db';
+import { initialRepetition } from '../repetition';
+import { getSetting } from '../storage/settings';
+import { sendToMake } from '../services/make';
 
 export function CaptureModal({
   instagramUrl,
@@ -19,13 +19,13 @@ export function CaptureModal({
   instagramUrl: string;
   onClose: () => void;
 }) {
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
 
   const save = async () => {
     setLoading(true);
 
-    const webhook = await getSetting("makeWebhook");
+    const webhook = await getSetting('makeWebhook');
     let mediaUrl = null;
     let mediaType = null;
 
@@ -34,13 +34,13 @@ export function CaptureModal({
         const data = await sendToMake(webhook, instagramUrl);
         mediaUrl = data.mediaUrl;
         mediaType = data.mediaType;
-      } catch { }
+      } catch {}
     }
 
     const createdAt = Date.now();
     const rep = initialRepetition();
 
-    db.transaction(tx => {
+    db.transaction((tx) => {
       tx.executeSql(
         `
         INSERT INTO posts
@@ -93,12 +93,12 @@ export function CaptureModal({
 
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 12 },
-  url: { fontSize: 12, color: "#666" },
+  url: { fontSize: 12, color: '#666' },
   input: {
     borderWidth: 1,
     borderRadius: 6,
     padding: 12,
     minHeight: 100,
-    textAlignVertical: "top"
+    textAlignVertical: 'top'
   }
 });
