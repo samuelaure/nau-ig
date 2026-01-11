@@ -6,22 +6,37 @@ import {
   StyleSheet,
   Dimensions,
   TouchableOpacity,
-  FlatList
+  FlatList,
+  ActivityIndicator
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { MoreHorizontal, Repeat } from 'lucide-react-native';
 import { MediaCacheService } from '../services/MediaCacheService';
-import { Post, MediaItem } from '../repositories/PostRepository';
+import {
+  Post,
+  MediaItem,
+  updatePostFrequency,
+  markPostAsReviewed
+} from '../repositories/PostRepository';
 
 const { width } = Dimensions.get('window');
 
-export const FeedItem = ({ post }: { post: Post }) => {
+interface FeedItemProps {
+  post: Post;
+  onProcessed: () => void;
+}
+
+export const FeedItem = ({ post, onProcessed }: FeedItemProps) => {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     const prepareMedia = async () => {
-      if (!post.mediaData) return;
+      if (!post.mediaData) {
+        setLoading(false);
+        return;
+      }
       try {
         const data: MediaItem[] = JSON.parse(post.mediaData);
         const cachedData = await Promise.all(
@@ -39,6 +54,31 @@ export const FeedItem = ({ post }: { post: Post }) => {
     };
     prepareMedia();
   }, [post.mediaData]);
+
+  const handleFrequencyChange = async (direction: 'more' | 'less') => {
+    setIsUpdating(true);
+    try {
+      await updatePostFrequency(post.id, direction);
+      onProcessed(); // Refresh feed
+    } catch (e) {
+      console.error('Failed to update frequency', e);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleReviewed = async () => {
+    setIsUpdating(true);
+    try {
+      // Mark as reviewed and schedule for next interval
+      await markPostAsReviewed(post.id, post.sm2_interval);
+      onProcessed(); // Refresh feed
+    } catch (e) {
+      console.error('Failed to mark as reviewed', e);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const renderMedia = ({ item }: { item: MediaItem }) => {
     const source = { uri: item.localUri || item.url };
@@ -69,8 +109,10 @@ export const FeedItem = ({ post }: { post: Post }) => {
 
       <View style={styles.mediaContainer}>
         {loading ? (
-          <View style={[styles.media, styles.loadingPlaceholder]} />
-        ) : (
+          <View style={[styles.media, styles.loadingPlaceholder]}>
+            <ActivityIndicator color="#000" />
+          </View>
+        ) : media.length > 0 ? (
           <FlatList
             data={media}
             renderItem={renderMedia}
@@ -79,23 +121,40 @@ export const FeedItem = ({ post }: { post: Post }) => {
             showsHorizontalScrollIndicator={false}
             keyExtractor={(item, index) => index.toString()}
           />
+        ) : (
+          <View style={[styles.media, styles.loadingPlaceholder]}>
+            <Text style={styles.emptyMediaText}>Processing media...</Text>
+          </View>
         )}
       </View>
 
       <View style={styles.actions}>
         <View style={styles.habitButtons}>
-          <TouchableOpacity style={styles.actionBtn}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => handleFrequencyChange('less')}
+            disabled={isUpdating}
+          >
             <Text style={styles.btnText}>Less</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, styles.primaryBtn]}>
-            <Text style={[styles.btnText, styles.primaryBtnText]}>Same</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => handleFrequencyChange('more')}
+            disabled={isUpdating}
+          >
             <Text style={styles.btnText}>More</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.repeatCircle}>
-          <Repeat size={20} color="#fff" />
+        <TouchableOpacity
+          style={styles.repeatCircle}
+          onPress={handleReviewed}
+          disabled={isUpdating}
+        >
+          {isUpdating ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Repeat size={20} color="#fff" />
+          )}
         </TouchableOpacity>
       </View>
 
@@ -106,7 +165,7 @@ export const FeedItem = ({ post }: { post: Post }) => {
             {post.content}
           </Text>
         )}
-        <Text style={styles.date}>Next review scheduled by SM-2</Text>
+        <Text style={styles.date}>Review due: {post.sm2_interval} days</Text>
       </View>
     </View>
   );
@@ -145,10 +204,16 @@ const styles = StyleSheet.create({
   },
   media: {
     width: width,
-    height: width
+    height: width,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   loadingPlaceholder: {
     backgroundColor: '#eee'
+  },
+  emptyMediaText: {
+    color: '#9ca3af',
+    fontSize: 12
   },
   actions: {
     flexDirection: 'row',
@@ -167,17 +232,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb'
   },
-  primaryBtn: {
-    backgroundColor: '#000',
-    borderColor: '#000'
-  },
   btnText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#4b5563'
-  },
-  primaryBtnText: {
-    color: '#fff'
   },
   repeatCircle: {
     backgroundColor: '#3b82f6',

@@ -57,7 +57,9 @@ export const FeedScreen = () => {
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => <FeedItem post={item} />}
+        renderItem={({ item }) => (
+          <FeedItem post={item} onProcessed={loadFeed} />
+        )}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
