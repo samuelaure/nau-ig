@@ -4,6 +4,7 @@
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
+    "apk": "cd android && gradlew assembleRelease",
     "start": "expo start",
     "android": "expo run:android",
     "lint": "eslint .",
