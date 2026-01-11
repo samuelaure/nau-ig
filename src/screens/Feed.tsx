@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,24 +6,27 @@ import {
   Button,
   StyleSheet,
   Image
-} from "react-native";
-import { db } from "../db";
-import { adjustRepetition } from "../repetition";
+} from 'react-native';
+import { db } from '../db';
+import { adjustRepetition } from '../repetition';
 
 interface Item {
   id: number;
-  instagramUrl: string;
   note: string;
   mediaUrl?: string;
   mediaType?: string;
   interval: number;
 }
 
-export function Feed({ onOpenSettings }: { onOpenSettings: () => void }) {
+export function Feed({
+  onOpenSettings
+}: {
+  onOpenSettings: () => void;
+}) {
   const [items, setItems] = useState<Item[]>([]);
 
   const load = () => {
-    db.transaction(tx => {
+    db.transaction((tx) => {
       tx.executeSql(
         `
         SELECT p.*, r.interval
@@ -40,9 +43,9 @@ export function Feed({ onOpenSettings }: { onOpenSettings: () => void }) {
 
   useEffect(load, []);
 
-  const act = (id: number, interval: number, action: any) => {
+  const act = (id: number, interval: number, action: 'less' | 'same' | 'more') => {
     const rep = adjustRepetition(interval, action);
-    db.transaction(tx => {
+    db.transaction((tx) => {
       tx.executeSql(
         `
         UPDATE repetition
@@ -56,39 +59,49 @@ export function Feed({ onOpenSettings }: { onOpenSettings: () => void }) {
   };
 
   return (
-    <ScrollView style={styles.feed}>
-      <Button title="Settings" onPress={onOpenSettings} />
+    <View style={{ flex: 1 }}>
+      <ScrollView style={styles.feed}>
+        {items.map((i) => (
+          <View key={i.id} style={styles.card}>
+            {i.mediaUrl && i.mediaType === 'image' && (
+              <Image source={{ uri: i.mediaUrl }} style={styles.image} />
+            )}
 
-      {items.map(i => (
-        <View key={i.id} style={styles.card}>
-          {i.mediaUrl && i.mediaType === "image" && (
-            <Image source={{ uri: i.mediaUrl }} style={styles.image} />
-          )}
+            {i.note ? <Text style={styles.note}>{i.note}</Text> : null}
 
-          {i.note ? <Text style={styles.note}>{i.note}</Text> : null}
-
-          <View style={styles.actions}>
-            <Button title="Less" onPress={() => act(i.id, i.interval, "less")} />
-            <Button title="Same" onPress={() => act(i.id, i.interval, "same")} />
-            <Button title="More" onPress={() => act(i.id, i.interval, "more")} />
+            <View style={styles.actions}>
+              <Button title="Less" onPress={() => act(i.id, i.interval, 'less')} />
+              <Button title="Same" onPress={() => act(i.id, i.interval, 'same')} />
+              <Button title="More" onPress={() => act(i.id, i.interval, 'more')} />
+            </View>
           </View>
-        </View>
-      ))}
-    </ScrollView>
+        ))}
+
+        {items.length === 0 && (
+          <Text style={styles.empty}>Nothing due now.</Text>
+        )}
+      </ScrollView>
+
+      <View style={styles.bottomBar}>
+        <Button title="Settings" onPress={onOpenSettings} />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  feed: { padding: 12 },
+  feed: {
+    padding: 12
+  },
   card: {
     marginBottom: 16,
     padding: 12,
     borderRadius: 10,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: '#f5f5f5',
     gap: 10
   },
   image: {
-    width: "100%",
+    width: '100%',
     height: 240,
     borderRadius: 8
   },
@@ -96,7 +109,17 @@ const styles = StyleSheet.create({
     fontSize: 16
   },
   actions: {
-    flexDirection: "row",
-    justifyContent: "space-between"
+    flexDirection: 'row',
+    justifyContent: 'space-between'
+  },
+  empty: {
+    textAlign: 'center',
+    marginTop: 40,
+    color: '#777'
+  },
+  bottomBar: {
+    borderTopWidth: 1,
+    borderColor: '#ddd',
+    padding: 10
   }
 });
