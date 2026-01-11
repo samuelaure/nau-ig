@@ -4,7 +4,6 @@ export const db = SQLite.openDatabase('nau_ig.db');
 
 export const initDb = () => {
   db.transaction((tx) => {
-    // Enhanced Posts table with media metadata and processing status
     tx.executeSql(`
       CREATE TABLE IF NOT EXISTS posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -13,7 +12,7 @@ export const initDb = () => {
         content TEXT,
         tags TEXT,
         frequency TEXT,
-        mediaData TEXT, -- JSON array of { type: 'image'|'video', url: string, localUri: string }
+        mediaData TEXT,
         isProcessed INTEGER DEFAULT 0,
         sm2_interval INTEGER DEFAULT 1,
         sm2_repetition INTEGER DEFAULT 0,

@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, Dimensions, TouchableOpacity, FlatList } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  Dimensions,
+  TouchableOpacity,
+  FlatList
+} from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
-import { MoreHorizontal, MessageCircle, Repeat, Heart } from 'lucide-react-native';
+import { MoreHorizontal, Repeat } from 'lucide-react-native';
 import { MediaCacheService } from '../services/MediaCacheService';
 import { Post, MediaItem } from '../repositories/PostRepository';
 
@@ -14,23 +22,26 @@ export const FeedItem = ({ post }: { post: Post }) => {
   useEffect(() => {
     const prepareMedia = async () => {
       if (!post.mediaData) return;
-      const data: MediaItem[] = JSON.parse(post.mediaData);
-      
-      const cachedData = await Promise.all(data.map(async (item) => ({
-        ...item,
-        localUri: await MediaCacheService.ensureMediaCached(item.url)
-      })));
-      
-      setMedia(cachedData);
-      setLoading(false);
+      try {
+        const data: MediaItem[] = JSON.parse(post.mediaData);
+        const cachedData = await Promise.all(
+          data.map(async (item) => ({
+            ...item,
+            localUri: await MediaCacheService.ensureMediaCached(item.url)
+          }))
+        );
+        setMedia(cachedData);
+      } catch (e) {
+        console.error('JSON Parse error for post media', e);
+      } finally {
+        setLoading(false);
+      }
     };
-
     prepareMedia();
   }, [post.mediaData]);
 
   const renderMedia = ({ item }: { item: MediaItem }) => {
     const source = { uri: item.localUri || item.url };
-    
     if (item.type === 'video') {
       return (
         <Video
@@ -43,13 +54,11 @@ export const FeedItem = ({ post }: { post: Post }) => {
         />
       );
     }
-
     return <Image source={source} style={styles.media} resizeMode="cover" />;
   };
 
   return (
     <View style={styles.container}>
-      {/* Post Header */}
       <View style={styles.header}>
         <View style={styles.userSection}>
           <View style={styles.avatarPlaceholder} />
@@ -58,7 +67,6 @@ export const FeedItem = ({ post }: { post: Post }) => {
         <MoreHorizontal size={20} color="#666" />
       </View>
 
-      {/* Media Section */}
       <View style={styles.mediaContainer}>
         {loading ? (
           <View style={[styles.media, styles.loadingPlaceholder]} />
@@ -74,19 +82,23 @@ export const FeedItem = ({ post }: { post: Post }) => {
         )}
       </View>
 
-      {/* Habit Actions (SM-2 Feedback) */}
       <View style={styles.actions}>
         <View style={styles.habitButtons}>
-          <TouchableOpacity style={styles.actionBtn}><Text style={styles.btnText}>Less</Text></TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, styles.primaryBtn]}><Text style={[styles.btnText, styles.primaryBtnText]}>Same</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn}><Text style={styles.btnText}>More</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn}>
+            <Text style={styles.btnText}>Less</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, styles.primaryBtn]}>
+            <Text style={[styles.btnText, styles.primaryBtnText]}>Same</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn}>
+            <Text style={styles.btnText}>More</Text>
+          </TouchableOpacity>
         </View>
         <TouchableOpacity style={styles.repeatCircle}>
           <Repeat size={20} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {/* Caption / Notes */}
       <View style={styles.content}>
         {post.content && (
           <Text style={styles.notes}>
@@ -103,69 +115,69 @@ export const FeedItem = ({ post }: { post: Post }) => {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
-    marginBottom: 12,
+    marginBottom: 12
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
+    padding: 12
   },
   userSection: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'center'
   },
   avatarPlaceholder: {
     width: 32,
     height: 32,
     borderRadius: 16,
     backgroundColor: '#f0f0f0',
-    marginRight: 10,
+    marginRight: 10
   },
   username: {
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 14
   },
   mediaContainer: {
     width: width,
     height: width,
-    backgroundColor: '#fafafa',
+    backgroundColor: '#fafafa'
   },
   media: {
     width: width,
-    height: width,
+    height: width
   },
   loadingPlaceholder: {
-    backgroundColor: '#eee',
+    backgroundColor: '#eee'
   },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
+    padding: 12
   },
   habitButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 8
   },
   actionBtn: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#e5e7eb'
   },
   primaryBtn: {
     backgroundColor: '#000',
-    borderColor: '#000',
+    borderColor: '#000'
   },
   btnText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#4b5563',
+    color: '#4b5563'
   },
   primaryBtnText: {
-    color: '#fff',
+    color: '#fff'
   },
   repeatCircle: {
     backgroundColor: '#3b82f6',
@@ -173,24 +185,24 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
   content: {
     paddingHorizontal: 12,
-    paddingBottom: 16,
+    paddingBottom: 16
   },
   notesLabel: {
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: '#1a1a1a'
   },
   notes: {
     fontSize: 14,
     color: '#4b5563',
-    lineHeight: 20,
+    lineHeight: 20
   },
   date: {
     fontSize: 11,
     color: '#9ca3af',
-    marginTop: 6,
-  },
+    marginTop: 6
+  }
 });

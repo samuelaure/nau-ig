@@ -1,10 +1,5 @@
 import { db } from '../db';
 
-/**
- * Specialized utility for application settings.
- * initSettings is removed here as it is now centralized in db.ts
- */
-
 export function setSetting(key: string, value: string): Promise<void> {
   return new Promise((resolve, reject) => {
     db.transaction((tx) => {

@@ -5,19 +5,17 @@ import { ShareIntentProvider } from './src/providers/ShareIntentProvider';
 import { ShareIntentModal } from './src/components/ShareIntentModal';
 import { FeedScreen } from './src/screens/FeedScreen';
 import { initDb } from './src/db';
+import { StatusBar } from 'expo-status-bar';
 
-// Initialize the local-first database
 initDb();
 
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
+        <StatusBar style="dark" translucent backgroundColor="transparent" />
         <ShareIntentProvider>
-          {/* Main Habit-Aware Feed */}
           <FeedScreen />
-          
-          {/* Share Capture Overlay */}
           <ShareIntentModal />
         </ShareIntentProvider>
       </SafeAreaProvider>

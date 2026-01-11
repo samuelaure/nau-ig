@@ -1,9 +1,5 @@
 import * as FileSystem from 'expo-file-system';
 
-/**
- * Handles the background download and local caching of Instagram media.
- * Ensures media is stored locally for offline-first performance.
- */
 export const MediaCacheService = {
   getFilename: (url: string) => {
     const parts = url.split('/');
@@ -28,12 +24,14 @@ export const MediaCacheService = {
       return download.uri;
     } catch (error) {
       console.error('Failed to download media:', error);
-      return url; // Fallback to remote if download fails
+      return url;
     }
   },
 
   clearCache: async () => {
-    const files = await FileSystem.readDirectoryAsync(FileSystem.documentDirectory!);
+    const files = await FileSystem.readDirectoryAsync(
+      FileSystem.documentDirectory!
+    );
     for (const file of files) {
       await FileSystem.deleteAsync(`${FileSystem.documentDirectory}${file}`);
     }
