@@ -2,21 +2,23 @@
   "expo": {
     "name": "9naŭ IG",
     "slug": "9nau-ig",
+    "scheme": "nau-ig",
     "version": "0.1.0",
     "orientation": "portrait",
     "platforms": ["android"],
     "android": {
       "package": "com.nau.ig",
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      },
       "intentFilters": [
         {
           "action": "SEND",
-          "data": [{ "mimeType": "text/plain" }],
-          "category": ["DEFAULT"]
+          "data": {
+            "mimeType": "text/plain"
+          }
         }
       ]
-    },
-    "splash": {
-      "backgroundColor": "#ffffff"
     }
   }
 }
