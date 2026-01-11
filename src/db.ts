@@ -2,10 +2,13 @@ import * as SQLite from 'expo-sqlite';
 
 export const db = SQLite.openDatabase('nau_ig.db');
 
+/**
+ * Ensures all tables exist with correct schemas.
+ * Following PRD Section 19.7 for Data Models.
+ */
 export const initDb = () => {
   db.transaction((tx) => {
-    // Drop and recreate or use ALTER TABLE if you have data you want to keep.
-    // For this dev phase, we ensure the schema is correct.
+    // Posts Table with SM-2 Spaced Repetition fields
     tx.executeSql(`
       CREATE TABLE IF NOT EXISTS posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,6 +25,7 @@ export const initDb = () => {
       );
     `);
 
+    // Key-Value settings store (Webhook URLs, User Preferences)
     tx.executeSql(`
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,

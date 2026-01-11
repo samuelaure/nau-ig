@@ -1,23 +1,23 @@
-import * as SQLite from 'expo-sqlite';
 import { db } from '../db';
 
-export function initSettings() {
-  db.transaction((tx) => {
-    tx.executeSql(`
-      CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT
-      );
-    `);
-  });
-}
+/**
+ * Specialized utility for application settings.
+ * initSettings is removed here as it is now centralized in db.ts
+ */
 
-export function setSetting(key: string, value: string) {
-  db.transaction((tx) => {
-    tx.executeSql(
-      `INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`,
-      [key, value]
-    );
+export function setSetting(key: string, value: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.transaction((tx) => {
+      tx.executeSql(
+        `INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`,
+        [key, value],
+        () => resolve(),
+        (_, err) => {
+          reject(err);
+          return false;
+        }
+      );
+    });
   });
 }
 
@@ -29,6 +29,10 @@ export function getSetting(key: string): Promise<string | null> {
         [key],
         (_, { rows }) => {
           resolve(rows.length ? rows.item(0).value : null);
+        },
+        () => {
+          resolve(null);
+          return false;
         }
       );
     });

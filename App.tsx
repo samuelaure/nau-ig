@@ -5,15 +5,17 @@ import { ShareIntentModal } from './src/components/ShareIntentModal';
 import { FeedScreen } from './src/screens/FeedScreen';
 import { initDb } from './src/db';
 
-// Ensure DB is ready
+// Single entry point for database and schema initialization
 initDb();
 
 export default function App() {
   return (
     <SafeAreaProvider>
       <ShareIntentProvider>
+        {/* The main feed where intentional repetition happens */}
         <FeedScreen />
-        {/* The modal is rendered globally if an intent exists */}
+
+        {/* Overlay that intercepts Instagram shares */}
         <ShareIntentModal />
       </ShareIntentProvider>
     </SafeAreaProvider>
