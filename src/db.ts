@@ -4,20 +4,22 @@ export const db = SQLite.openDatabase("nau.db");
 
 export function initDb() {
   db.transaction(tx => {
-    tx.executeSql(
-      `CREATE TABLE IF NOT EXISTS posts (
+    tx.executeSql(`
+      CREATE TABLE IF NOT EXISTS posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        instagramUrl TEXT,
-        caption TEXT,
-        createdAt INTEGER
-      );`
-    );
-    tx.executeSql(
-      `CREATE TABLE IF NOT EXISTS repetition (
-        postId INTEGER,
-        interval INTEGER,
-        nextDueAt INTEGER
-      );`
-    );
+        instagramUrl TEXT NOT NULL,
+        note TEXT,
+        createdAt INTEGER NOT NULL
+      );
+    `);
+
+    tx.executeSql(`
+      CREATE TABLE IF NOT EXISTS repetition (
+        postId INTEGER PRIMARY KEY,
+        interval INTEGER NOT NULL,
+        nextDueAt INTEGER NOT NULL,
+        lastInteractionAt INTEGER NOT NULL
+      );
+    `);
   });
 }

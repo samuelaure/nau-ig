@@ -1,38 +1,78 @@
 import React, { useState } from "react";
-import { View, TextInput, Button } from "react-native";
+import { View, Text, TextInput, Button, StyleSheet } from "react-native";
 import { db } from "../db";
 import { initialRepetition } from "../repetition";
 
-export function CaptureModal({ url, onClose }: { url: string; onClose: () => void }) {
-  const [caption, setCaption] = useState("");
+export function CaptureModal({
+  url,
+  onClose
+}: {
+  url: string;
+  onClose: () => void;
+}) {
+  const [note, setNote] = useState("");
 
   const save = () => {
     const createdAt = Date.now();
+    const rep = initialRepetition();
+
     db.transaction(tx => {
       tx.executeSql(
-        "INSERT INTO posts (instagramUrl, caption, createdAt) values (?, ?, ?)",
-        [url, caption, createdAt],
+        `INSERT INTO posts (instagramUrl, note, createdAt)
+         VALUES (?, ?, ?)`,
+        [url, note, createdAt],
         (_, result) => {
-          const rep = initialRepetition();
-          tx.executeSql(
-            "INSERT INTO repetition (postId, interval, nextDueAt) values (?, ?, ?)",
-            [result.insertId, rep.interval, rep.nextDueAt]
-          );
+          if (result.insertId !== undefined) {
+            tx.executeSql(
+              `INSERT INTO repetition
+               (postId, interval, nextDueAt, lastInteractionAt)
+               VALUES (?, ?, ?, ?)`,
+              [result.insertId, rep.interval, rep.nextDueAt, rep.lastInteractionAt]
+            );
+          }
         }
       );
     });
+
     onClose();
   };
 
   return (
-    <View style={{ padding: 16 }}>
+    <View style={styles.container}>
+      <Text style={styles.label}>Instagram link</Text>
+      <Text style={styles.url}>{url}</Text>
+
       <TextInput
-        placeholder="Optional note"
-        value={caption}
-        onChangeText={setCaption}
-        style={{ borderWidth: 1, marginBottom: 12 }}
+        placeholder="Add your note (optional)"
+        multiline
+        value={note}
+        onChangeText={setNote}
+        style={styles.input}
       />
-      <Button title="Save" onPress={save} />
+
+      <Button title="Save & return to Instagram" onPress={save} />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 16,
+    gap: 12
+  },
+  label: {
+    fontWeight: "600"
+  },
+  url: {
+    fontSize: 12,
+    color: "#555"
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    padding: 12,
+    borderRadius: 6,
+    minHeight: 100,
+    textAlignVertical: "top"
+  }
+});
