@@ -6,6 +6,9 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "platforms": ["android"],
+    "splash": {
+      "backgroundColor": "#ffffff"
+    },
     "android": {
       "package": "com.nau.ig",
       "adaptiveIcon": {
