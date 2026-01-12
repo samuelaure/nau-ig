@@ -23,7 +23,27 @@ export const getDuePosts = (): Promise<Post[]> => {
   return new Promise((resolve, reject) => {
     db.transaction((tx) => {
       tx.executeSql(
-        `SELECT * FROM posts WHERE next_review_at <= datetime('now') OR next_review_at IS NULL ORDER BY next_review_at ASC`,
+        `SELECT * FROM posts 
+         WHERE (next_review_at <= datetime('now') OR next_review_at IS NULL) 
+         ORDER BY next_review_at ASC`,
+        [],
+        (_, { rows }) => resolve(rows._array),
+        (_, err) => {
+          reject(err);
+          return false;
+        }
+      );
+    });
+  });
+};
+
+export const getReviewedPosts = (): Promise<Post[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction((tx) => {
+      tx.executeSql(
+        `SELECT * FROM posts 
+         WHERE next_review_at > datetime('now') 
+         ORDER BY next_review_at DESC`,
         [],
         (_, { rows }) => resolve(rows._array),
         (_, err) => {
@@ -39,9 +59,6 @@ export const updatePostFrequency = (
   id: number,
   direction: 'more' | 'less'
 ): Promise<void> => {
-  // Manual frequency adjustment based on user input
-  // More -> Decrease review interval (see it sooner)
-  // Less -> Increase review interval (see it later)
   return new Promise((resolve, reject) => {
     db.transaction((tx) => {
       tx.executeSql(

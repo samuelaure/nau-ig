@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,8 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
-import { MoreHorizontal, Repeat } from 'lucide-react-native';
+import { MoreHorizontal, Repeat, CheckCircle2 } from 'lucide-react-native';
+import { TapGestureHandler, State } from 'react-native-gesture-handler';
 import { MediaCacheService } from '../services/MediaCacheService';
 import {
   Post,
@@ -24,12 +25,14 @@ const { width } = Dimensions.get('window');
 interface FeedItemProps {
   post: Post;
   onProcessed: () => void;
+  isHistory?: boolean;
 }
 
-export const FeedItem = ({ post, onProcessed }: FeedItemProps) => {
+export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
+  const doubleTapRef = useRef(null);
 
   useEffect(() => {
     const prepareMedia = async () => {
@@ -59,7 +62,7 @@ export const FeedItem = ({ post, onProcessed }: FeedItemProps) => {
     setIsUpdating(true);
     try {
       await updatePostFrequency(post.id, direction);
-      onProcessed(); // Refresh feed
+      onProcessed();
     } catch (e) {
       console.error('Failed to update frequency', e);
     } finally {
@@ -68,15 +71,22 @@ export const FeedItem = ({ post, onProcessed }: FeedItemProps) => {
   };
 
   const handleReviewed = async () => {
+    if (isHistory) return;
+
     setIsUpdating(true);
     try {
-      // Mark as reviewed and schedule for next interval
       await markPostAsReviewed(post.id, post.sm2_interval);
-      onProcessed(); // Refresh feed
+      onProcessed();
     } catch (e) {
       console.error('Failed to mark as reviewed', e);
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const onDoubleTap = (event: any) => {
+    if (event.nativeEvent.state === State.ACTIVE) {
+      handleReviewed();
     }
   };
 
@@ -102,56 +112,73 @@ export const FeedItem = ({ post, onProcessed }: FeedItemProps) => {
       <View style={styles.header}>
         <View style={styles.userSection}>
           <View style={styles.avatarPlaceholder} />
-          <Text style={styles.username}>{post.title || 'Saved Post'}</Text>
+          <View>
+            <Text style={styles.username}>{post.title || 'Saved Post'}</Text>
+            <Text style={styles.frequencyTag}>Internalizing habit</Text>
+          </View>
         </View>
         <MoreHorizontal size={20} color="#666" />
       </View>
 
-      <View style={styles.mediaContainer}>
-        {loading ? (
-          <View style={[styles.media, styles.loadingPlaceholder]}>
-            <ActivityIndicator color="#000" />
-          </View>
-        ) : media.length > 0 ? (
-          <FlatList
-            data={media}
-            renderItem={renderMedia}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(item, index) => index.toString()}
-          />
-        ) : (
-          <View style={[styles.media, styles.loadingPlaceholder]}>
-            <Text style={styles.emptyMediaText}>Processing media...</Text>
-          </View>
-        )}
-      </View>
+      <TapGestureHandler
+        onHandlerStateChange={onDoubleTap}
+        numberOfTaps={2}
+        ref={doubleTapRef}
+      >
+        <View style={styles.mediaContainer}>
+          {loading ? (
+            <View style={[styles.media, styles.loadingPlaceholder]}>
+              <ActivityIndicator color="#000" />
+            </View>
+          ) : media.length > 0 ? (
+            <FlatList
+              data={media}
+              renderItem={renderMedia}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item, index) => index.toString()}
+            />
+          ) : (
+            <View style={[styles.media, styles.loadingPlaceholder]}>
+              <Text style={styles.emptyMediaText}>Processing media...</Text>
+            </View>
+          )}
+        </View>
+      </TapGestureHandler>
 
       <View style={styles.actions}>
-        <View style={styles.habitButtons}>
+        <View style={styles.frequencyControlGroup}>
           <TouchableOpacity
-            style={styles.actionBtn}
+            style={styles.freqActionBtn}
             onPress={() => handleFrequencyChange('less')}
             disabled={isUpdating}
           >
-            <Text style={styles.btnText}>Less</Text>
+            <Text style={styles.freqBtnText}>Less</Text>
           </TouchableOpacity>
+
+          <View style={styles.frequencyBadge}>
+            <Text style={styles.frequencyValue}>{post.sm2_interval}d</Text>
+          </View>
+
           <TouchableOpacity
-            style={styles.actionBtn}
+            style={styles.freqActionBtn}
             onPress={() => handleFrequencyChange('more')}
             disabled={isUpdating}
           >
-            <Text style={styles.btnText}>More</Text>
+            <Text style={styles.freqBtnText}>More</Text>
           </TouchableOpacity>
         </View>
+
         <TouchableOpacity
-          style={styles.repeatCircle}
+          style={[styles.repeatCircle, isHistory && styles.historyCircle]}
           onPress={handleReviewed}
-          disabled={isUpdating}
+          disabled={isUpdating || isHistory}
         >
           {isUpdating ? (
             <ActivityIndicator size="small" color="#fff" />
+          ) : isHistory ? (
+            <CheckCircle2 size={22} color="#fff" />
           ) : (
             <Repeat size={20} color="#fff" />
           )}
@@ -165,7 +192,12 @@ export const FeedItem = ({ post, onProcessed }: FeedItemProps) => {
             {post.content}
           </Text>
         )}
-        <Text style={styles.date}>Review due: {post.sm2_interval} days</Text>
+        <View style={styles.footerInfo}>
+          <Text style={styles.date}>
+            {isHistory ? 'Next review in' : 'Review due in'} {post.sm2_interval}{' '}
+            days
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -197,6 +229,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 14
   },
+  frequencyTag: {
+    fontSize: 10,
+    color: '#3b82f6',
+    fontWeight: '600'
+  },
   mediaContainer: {
     width: width,
     height: width,
@@ -221,29 +258,59 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 12
   },
-  habitButtons: {
+  frequencyControlGroup: {
     flexDirection: 'row',
-    gap: 8
-  },
-  actionBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 24,
+    padding: 4,
     borderWidth: 1,
     borderColor: '#e5e7eb'
   },
-  btnText: {
+  freqActionBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20
+  },
+  freqBtnText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#4b5563'
+  },
+  frequencyBadge: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    minWidth: 40,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 2
+  },
+  frequencyValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#000'
   },
   repeatCircle: {
     backgroundColor: '#3b82f6',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4
+  },
+  historyCircle: {
+    backgroundColor: '#10b981',
+    shadowColor: '#10b981'
   },
   content: {
     paddingHorizontal: 12,
@@ -258,9 +325,15 @@ const styles = StyleSheet.create({
     color: '#4b5563',
     lineHeight: 20
   },
+  footerInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8
+  },
   date: {
     fontSize: 11,
     color: '#9ca3af',
-    marginTop: 6
+    fontStyle: 'italic'
   }
 });

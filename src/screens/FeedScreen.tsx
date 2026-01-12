@@ -7,29 +7,34 @@ import {
   Text,
   TouchableOpacity
 } from 'react-native';
-import {
-  SafeAreaView,
-  useSafeAreaInsets
-} from 'react-native-safe-area-context';
-import { Settings } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Settings, LayoutGrid, Clock } from 'lucide-react-native';
 import { FeedItem } from '../components/FeedItem';
 import { SettingsModal } from '../components/SettingsModal';
-import { getDuePosts, Post } from '../repositories/PostRepository';
+import {
+  getDuePosts,
+  getReviewedPosts,
+  Post
+} from '../repositories/PostRepository';
+
+type FeedTab = 'due' | 'reviewed';
 
 export const FeedScreen = () => {
   const insets = useSafeAreaInsets();
+  const [activeTab, setActiveTab] = useState<FeedTab>('due');
   const [posts, setPosts] = useState<Post[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
 
   const loadFeed = useCallback(async () => {
     try {
-      const data = await getDuePosts();
+      const data =
+        activeTab === 'due' ? await getDuePosts() : await getReviewedPosts();
       setPosts(data);
     } catch (error) {
       console.error('Failed to load feed:', error);
     }
-  }, []);
+  }, [activeTab]);
 
   useEffect(() => {
     loadFeed();
@@ -54,20 +59,68 @@ export const FeedScreen = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Tab Switcher */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'due' && styles.activeTab]}
+          onPress={() => setActiveTab('due')}
+        >
+          <LayoutGrid
+            size={20}
+            color={activeTab === 'due' ? '#000' : '#9ca3af'}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'due' && styles.activeTabText
+            ]}
+          >
+            To Review
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'reviewed' && styles.activeTab]}
+          onPress={() => setActiveTab('reviewed')}
+        >
+          <Clock
+            size={20}
+            color={activeTab === 'reviewed' ? '#000' : '#9ca3af'}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'reviewed' && styles.activeTabText
+            ]}
+          >
+            History
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <FlatList
         data={posts}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => `${activeTab}-${item.id}`}
         renderItem={({ item }) => (
-          <FeedItem post={item} onProcessed={loadFeed} />
+          <FeedItem
+            post={item}
+            onProcessed={loadFeed}
+            isHistory={activeTab === 'reviewed'}
+          />
         )}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyText}>Nothing due for review yet.</Text>
+            <Text style={styles.emptyText}>
+              {activeTab === 'due'
+                ? 'You reached Review Zero!'
+                : 'No history yet.'}
+            </Text>
             <Text style={styles.emptySubText}>
-              Capture posts from Instagram to start your habit.
+              {activeTab === 'due'
+                ? 'Great job! Check your history or capture more content.'
+                : 'Reviewed posts will appear here.'}
             </Text>
           </View>
         }
@@ -109,6 +162,31 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
     color: '#000',
     textAlign: 'center'
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6'
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 8
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#000'
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9ca3af'
+  },
+  activeTabText: {
+    color: '#000'
   },
   empty: {
     flex: 1,
