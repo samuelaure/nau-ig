@@ -56,9 +56,6 @@ export const getReviewedPosts = (): Promise<Post[]> => {
   });
 };
 
-/**
- * Fetches all posts that are currently waiting for media processing.
- */
 export const getPendingPosts = (): Promise<Post[]> => {
   return new Promise((resolve, reject) => {
     db.transaction((tx) => {
@@ -87,6 +84,22 @@ export const updatePostFrequency = (
              next_review_at = datetime('now', '+' || (CASE WHEN ? = 'more' THEN MAX(1, sm2_interval / 2) ELSE sm2_interval * 2 END) || ' days')
          WHERE id = ?`,
         [direction, direction, id],
+        () => resolve(),
+        (_, err) => {
+          reject(err);
+          return false;
+        }
+      );
+    });
+  });
+};
+
+export const updatePostNote = (id: number, content: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction((tx) => {
+      tx.executeSql(
+        `UPDATE posts SET content = ? WHERE id = ?`,
+        [content, id],
         () => resolve(),
         (_, err) => {
           reject(err);
