@@ -1,20 +1,27 @@
 import { MediaItem } from '../repositories/PostRepository';
 
-interface WebhookResponse {
+interface SyncResult {
   status: 'success' | 'pending' | 'error';
   mediaData?: MediaItem[];
 }
 
+interface WebhookResponse {
+  status: 'success' | 'error';
+  // For batch sync, return a map of postId -> result
+  results?: Record<number, SyncResult>;
+}
+
 /**
  * Service to interact with the Make.com webhook.
- * Handles both initial capture and subsequent background synchronization.
+ * Optimized for batch processing of multiple captured posts.
  */
 export async function sendToMake(
   webhookUrl: string,
   payload: {
-    action: 'capture' | 'sync';
+    action: 'capture' | 'sync_batch';
     instagramUrl?: string;
     postId?: number;
+    items?: { id: number; url: string }[];
   }
 ): Promise<WebhookResponse> {
   let retries = 3;
