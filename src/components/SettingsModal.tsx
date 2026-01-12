@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Alert
 } from 'react-native';
-import { X, Globe } from 'lucide-react-native';
+import { X, Globe, Database, Trash2 } from 'lucide-react-native';
 import { getSetting, setSetting } from '../storage/settings';
+import { MediaCacheService } from '../services/MediaCacheService';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -19,6 +21,7 @@ interface SettingsModalProps {
 
 export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
   const [webhookUrl, setWebhookUrl] = useState('');
+  const [isClearing, setIsClearing] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -29,6 +32,28 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
   const handleSave = async () => {
     await setSetting('make_webhook_url', webhookUrl);
     onClose();
+  };
+
+  const handleClearCache = async () => {
+    Alert.alert(
+      'Clear Media Cache?',
+      'All downloaded images and videos will be removed. They will be background-downloaded again when you view them in the feed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            setIsClearing(true);
+            try {
+              await MediaCacheService.clearCache();
+            } finally {
+              setIsClearing(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -47,6 +72,7 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
             </View>
 
             <View style={styles.content}>
+              {/* Webhook Settings */}
               <Text style={styles.label}>Make.com Webhook URL</Text>
               <View style={styles.inputContainer}>
                 <Globe size={18} color="#9ca3af" style={styles.inputIcon} />
@@ -59,9 +85,28 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
                   autoCorrect={false}
                 />
               </View>
+
+              {/* Storage Settings */}
+              <View style={styles.sectionDivider} />
+              <Text style={styles.label}>Media Management</Text>
+              <TouchableOpacity
+                style={styles.dangerActionBtn}
+                onPress={handleClearCache}
+                disabled={isClearing}
+              >
+                <Database size={18} color="#ef4444" style={styles.inputIcon} />
+                <Text style={styles.dangerActionText}>
+                  {isClearing ? 'Clearing...' : 'Clear Media Cache'}
+                </Text>
+                <Trash2
+                  size={16}
+                  color="#ef4444"
+                  style={{ marginLeft: 'auto' }}
+                />
+              </TouchableOpacity>
               <Text style={styles.helpText}>
-                This URL is used to trigger media processing and background
-                downloads.
+                Clearing the cache frees up local storage. Media is
+                automatically re-downloaded when needed.
               </Text>
 
               <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
@@ -113,6 +158,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#374151'
   },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: '#f3f4f6',
+    marginVertical: 12
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -129,6 +179,21 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     fontSize: 14
+  },
+  dangerActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fee2e2',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12
+  },
+  dangerActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ef4444'
   },
   helpText: {
     fontSize: 12,
