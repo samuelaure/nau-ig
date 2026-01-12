@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  Animated
+  Animated,
+  TextInput
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import {
@@ -23,7 +24,8 @@ import {
   Post,
   MediaItem,
   updatePostFrequency,
-  markPostAsReviewed
+  markPostAsReviewed,
+  updatePostNote
 } from '../repositories/PostRepository';
 
 const { width } = Dimensions.get('window');
@@ -36,11 +38,16 @@ interface FeedItemProps {
 
 export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
   const [media, setMedia] = useState<MediaItem[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
-  const doubleTapRef = useRef(null);
 
-  // Animation for processing status
+  // Note Evolution State
+  const [isEditingNote, setIsEditingNote] = useState(false);
+  const [noteDraft, setNoteDraft] = useState(post.content || '');
+
+  const doubleTapRef = useRef(null);
+  const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
@@ -62,6 +69,12 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
     }
 
     const prepareMedia = async () => {
+      if (post.tags) {
+        try {
+          setTags(JSON.parse(post.tags));
+        } catch (e) {}
+      }
+
       if (!post.mediaData || post.isProcessed === 0) {
         setLoading(false);
         return;
@@ -82,7 +95,33 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
       }
     };
     prepareMedia();
-  }, [post.mediaData, post.isProcessed, pulseAnim]);
+  }, [post.mediaData, post.isProcessed, post.tags, pulseAnim]);
+
+  // Zero-Button Persistence: Auto-save logic
+  const persistNote = useCallback(
+    async (content: string) => {
+      if (content === post.content) return;
+      try {
+        await updatePostNote(post.id, content);
+      } catch (e) {
+        console.error('Failed to auto-save note', e);
+      }
+    },
+    [post.id, post.content]
+  );
+
+  // Debounced save (1.5s of inactivity)
+  useEffect(() => {
+    if (isEditingNote) {
+      if (saveTimeout.current) clearTimeout(saveTimeout.current);
+      saveTimeout.current = setTimeout(() => {
+        persistNote(noteDraft);
+      }, 1500);
+    }
+    return () => {
+      if (saveTimeout.current) clearTimeout(saveTimeout.current);
+    };
+  }, [noteDraft, isEditingNote, persistNote]);
 
   const handleFrequencyChange = async (direction: 'more' | 'less') => {
     setIsUpdating(true);
@@ -98,7 +137,6 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
 
   const handleReviewed = async () => {
     if (isHistory || post.isProcessed === 0) return;
-
     setIsUpdating(true);
     try {
       await markPostAsReviewed(post.id, post.sm2_interval);
@@ -140,7 +178,13 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
           <View style={styles.avatarPlaceholder} />
           <View>
             <Text style={styles.username}>{post.title || 'Saved Post'}</Text>
-            <Text style={styles.frequencyTag}>Internalizing habit</Text>
+            <View style={styles.tagDisplayList}>
+              {tags.map((tag, idx) => (
+                <Text key={idx} style={styles.headerTagText}>
+                  #{tag}{' '}
+                </Text>
+              ))}
+            </View>
           </View>
         </View>
         <MoreHorizontal size={20} color="#666" />
@@ -201,11 +245,9 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
           >
             <Text style={styles.freqBtnText}>Less</Text>
           </TouchableOpacity>
-
           <View style={styles.frequencyBadge}>
             <Text style={styles.frequencyValue}>{post.sm2_interval}d</Text>
           </View>
-
           <TouchableOpacity
             style={styles.freqActionBtn}
             onPress={() => handleFrequencyChange('more')}
@@ -234,12 +276,39 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
         </TouchableOpacity>
       </View>
 
+      {/* Note Evolution Canvas */}
       <View style={styles.content}>
-        {post.content && (
-          <Text style={styles.notes}>
-            <Text style={styles.notesLabel}>My Notes: </Text>
-            {post.content}
-          </Text>
+        {isEditingNote ? (
+          <TextInput
+            style={[styles.notes, styles.noteInput]}
+            value={noteDraft}
+            onChangeText={setNoteDraft}
+            multiline
+            autoFocus
+            onBlur={() => {
+              setIsEditingNote(false);
+              persistNote(noteDraft);
+            }}
+            placeholder="Expand your thoughts..."
+            placeholderTextColor="#9ca3af"
+          />
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.notePreview}
+            onPress={() => setIsEditingNote(true)}
+          >
+            {post.content ? (
+              <Text style={styles.notes}>
+                <Text style={styles.notesLabel}>My Notes: </Text>
+                {post.content}
+              </Text>
+            ) : (
+              <Text style={styles.emptyNotePlaceholder}>
+                Tap to add your thoughts...
+              </Text>
+            )}
+          </TouchableOpacity>
         )}
         <View style={styles.footerInfo}>
           <Text style={styles.date}>
@@ -278,7 +347,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 14
   },
-  frequencyTag: {
+  tagDisplayList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap'
+  },
+  headerTagText: {
     fontSize: 10,
     color: '#3b82f6',
     fontWeight: '600'
@@ -379,6 +452,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingBottom: 16
   },
+  notePreview: {
+    paddingVertical: 8,
+    minHeight: 40
+  },
+  noteInput: {
+    paddingVertical: 8,
+    minHeight: 40,
+    textAlignVertical: 'top'
+  },
   notesLabel: {
     fontWeight: '700',
     color: '#1a1a1a'
@@ -387,6 +469,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4b5563',
     lineHeight: 20
+  },
+  emptyNotePlaceholder: {
+    fontSize: 14,
+    color: '#9ca3af',
+    fontStyle: 'italic'
   },
   footerInfo: {
     flexDirection: 'row',
