@@ -3,11 +3,14 @@
     "name": "9naŭ IG",
     "slug": "9nau-ig",
     "scheme": "nau-ig",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "platforms": ["android"],
     "splash": {
       "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "bundleIdentifier": "com.nau.ig"
     },
     "android": {
       "package": "com.nau.ig",
@@ -17,11 +20,11 @@
       "intentFilters": [
         {
           "action": "SEND",
-          "data": {
-            "mimeType": "text/plain"
-          }
+          "data": [{ "mimeType": "text/plain" }],
+          "category": ["DEFAULT"]
         }
       ]
-    }
+    },
+    "plugins": []
   }
 }
