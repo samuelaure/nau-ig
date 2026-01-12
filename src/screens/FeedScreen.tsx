@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -14,8 +14,12 @@ import { SettingsModal } from '../components/SettingsModal';
 import {
   getDuePosts,
   getReviewedPosts,
+  getPendingPosts,
+  updatePostMedia,
   Post
 } from '../repositories/PostRepository';
+import { getSetting } from '../storage/settings';
+import { sendToMake } from '../services/make';
 
 type FeedTab = 'due' | 'reviewed';
 
@@ -25,6 +29,7 @@ export const FeedScreen = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const syncInterval = useRef<NodeJS.Timeout | null>(null);
 
   const loadFeed = useCallback(async () => {
     try {
@@ -36,12 +41,50 @@ export const FeedScreen = () => {
     }
   }, [activeTab]);
 
+  /**
+   * Background Sync Loop:
+   * Periodically checks for posts that are still processing (isProcessed = 0)
+   * and asks the webhook for the resolved media data.
+   */
+  const performBackgroundSync = useCallback(async () => {
+    const webhookUrl = await getSetting('make_webhook_url');
+    if (!webhookUrl) return;
+
+    const pending = await getPendingPosts();
+    if (pending.length === 0) return;
+
+    for (const post of pending) {
+      try {
+        const response = await sendToMake(webhookUrl, {
+          action: 'sync',
+          postId: post.id,
+          instagramUrl: post.instagramUrl
+        });
+
+        if (response.status === 'success' && response.mediaData) {
+          await updatePostMedia(post.id, response.mediaData);
+          loadFeed(); // Refresh UI once media is ready
+        }
+      } catch (e) {
+        // Silent fail for background sync to avoid annoying the user
+      }
+    }
+  }, [loadFeed]);
+
   useEffect(() => {
     loadFeed();
-  }, [loadFeed]);
+
+    // Start polling every 10 seconds when screen is mounted
+    syncInterval.current = setInterval(performBackgroundSync, 10000);
+
+    return () => {
+      if (syncInterval.current) clearInterval(syncInterval.current);
+    };
+  }, [loadFeed, performBackgroundSync]);
 
   const onRefresh = async () => {
     setRefreshing(true);
+    await performBackgroundSync(); // Trigger an immediate sync on pull-to-refresh
     await loadFeed();
     setRefreshing(false);
   };
@@ -59,7 +102,6 @@ export const FeedScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Tab Switcher */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'due' && styles.activeTab]}

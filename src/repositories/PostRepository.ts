@@ -13,6 +13,7 @@ export interface Post {
   content?: string;
   tags?: string;
   mediaData?: string;
+  isProcessed: number;
   sm2_interval: number;
   sm2_ease_factor: number;
   sm2_repetition: number;
@@ -44,6 +45,25 @@ export const getReviewedPosts = (): Promise<Post[]> => {
         `SELECT * FROM posts 
          WHERE next_review_at > datetime('now') 
          ORDER BY next_review_at DESC`,
+        [],
+        (_, { rows }) => resolve(rows._array),
+        (_, err) => {
+          reject(err);
+          return false;
+        }
+      );
+    });
+  });
+};
+
+/**
+ * Fetches all posts that are currently waiting for media processing.
+ */
+export const getPendingPosts = (): Promise<Post[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction((tx) => {
+      tx.executeSql(
+        `SELECT * FROM posts WHERE isProcessed = 0`,
         [],
         (_, { rows }) => resolve(rows._array),
         (_, err) => {
@@ -122,8 +142,8 @@ export const savePost = (post: any): Promise<number> => {
   return new Promise((resolve, reject) => {
     db.transaction((tx) => {
       tx.executeSql(
-        `INSERT INTO posts (instagramUrl, title, content, tags, frequency, sm2_interval, next_review_at) 
-         VALUES (?, ?, ?, ?, ?, 1, datetime('now'))`,
+        `INSERT INTO posts (instagramUrl, title, content, tags, frequency, sm2_interval, isProcessed, next_review_at) 
+         VALUES (?, ?, ?, ?, ?, 1, 0, datetime('now'))`,
         [
           post.instagramUrl,
           post.title,

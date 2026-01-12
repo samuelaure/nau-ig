@@ -7,10 +7,16 @@ import {
   Dimensions,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator
+  ActivityIndicator,
+  Animated
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
-import { MoreHorizontal, Repeat, CheckCircle2 } from 'lucide-react-native';
+import {
+  MoreHorizontal,
+  Repeat,
+  CheckCircle2,
+  DownloadCloud
+} from 'lucide-react-native';
 import { TapGestureHandler, State } from 'react-native-gesture-handler';
 import { MediaCacheService } from '../services/MediaCacheService';
 import {
@@ -34,9 +40,29 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const doubleTapRef = useRef(null);
 
+  // Animation for processing status
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
+
   useEffect(() => {
+    if (post.isProcessed === 0) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0.4,
+            duration: 1000,
+            useNativeDriver: true
+          })
+        ])
+      ).start();
+    }
+
     const prepareMedia = async () => {
-      if (!post.mediaData) {
+      if (!post.mediaData || post.isProcessed === 0) {
         setLoading(false);
         return;
       }
@@ -56,7 +82,7 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
       }
     };
     prepareMedia();
-  }, [post.mediaData]);
+  }, [post.mediaData, post.isProcessed, pulseAnim]);
 
   const handleFrequencyChange = async (direction: 'more' | 'less') => {
     setIsUpdating(true);
@@ -71,7 +97,7 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
   };
 
   const handleReviewed = async () => {
-    if (isHistory) return;
+    if (isHistory || post.isProcessed === 0) return;
 
     setIsUpdating(true);
     try {
@@ -124,9 +150,26 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
         onHandlerStateChange={onDoubleTap}
         numberOfTaps={2}
         ref={doubleTapRef}
+        enabled={post.isProcessed === 1}
       >
         <View style={styles.mediaContainer}>
-          {loading ? (
+          {post.isProcessed === 0 ? (
+            <Animated.View
+              style={[
+                styles.media,
+                styles.processingContainer,
+                { opacity: pulseAnim }
+              ]}
+            >
+              <DownloadCloud size={40} color="#9ca3af" />
+              <Text style={styles.processingText}>Preparing media...</Text>
+              <ActivityIndicator
+                size="small"
+                color="#9ca3af"
+                style={{ marginTop: 12 }}
+              />
+            </Animated.View>
+          ) : loading ? (
             <View style={[styles.media, styles.loadingPlaceholder]}>
               <ActivityIndicator color="#000" />
             </View>
@@ -141,7 +184,9 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
             />
           ) : (
             <View style={[styles.media, styles.loadingPlaceholder]}>
-              <Text style={styles.emptyMediaText}>Processing media...</Text>
+              <Text style={styles.emptyMediaText}>
+                Media error. Pull to refresh.
+              </Text>
             </View>
           )}
         </View>
@@ -171,9 +216,13 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
         </View>
 
         <TouchableOpacity
-          style={[styles.repeatCircle, isHistory && styles.historyCircle]}
+          style={[
+            styles.repeatCircle,
+            isHistory && styles.historyCircle,
+            post.isProcessed === 0 && styles.disabledCircle
+          ]}
           onPress={handleReviewed}
-          disabled={isUpdating || isHistory}
+          disabled={isUpdating || isHistory || post.isProcessed === 0}
         >
           {isUpdating ? (
             <ActivityIndicator size="small" color="#fff" />
@@ -245,6 +294,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center'
   },
+  processingContainer: {
+    backgroundColor: '#f9fafb'
+  },
+  processingText: {
+    marginTop: 12,
+    color: '#9ca3af',
+    fontSize: 14,
+    fontWeight: '500'
+  },
   loadingPlaceholder: {
     backgroundColor: '#eee'
   },
@@ -311,6 +369,11 @@ const styles = StyleSheet.create({
   historyCircle: {
     backgroundColor: '#10b981',
     shadowColor: '#10b981'
+  },
+  disabledCircle: {
+    backgroundColor: '#e5e7eb',
+    shadowOpacity: 0,
+    elevation: 0
   },
   content: {
     paddingHorizontal: 12,
