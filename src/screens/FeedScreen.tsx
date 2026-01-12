@@ -5,16 +5,23 @@ import {
   FlatList,
   RefreshControl,
   Text,
-  TouchableOpacity
+  TouchableOpacity,
+  ScrollView
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Settings, LayoutGrid, Clock } from 'lucide-react-native';
+import {
+  Settings,
+  LayoutGrid,
+  Clock,
+  Tag as TagIcon
+} from 'lucide-react-native';
 import { FeedItem } from '../components/FeedItem';
 import { SettingsModal } from '../components/SettingsModal';
 import {
   getDuePosts,
   getReviewedPosts,
   getPendingPosts,
+  getAllTags,
   updatePostMedia,
   Post
 } from '../repositories/PostRepository';
@@ -27,6 +34,8 @@ export const FeedScreen = () => {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<FeedTab>('due');
   const [posts, setPosts] = useState<Post[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const syncInterval = useRef<NodeJS.Timeout | null>(null);
@@ -34,17 +43,21 @@ export const FeedScreen = () => {
   const loadFeed = useCallback(async () => {
     try {
       const data =
-        activeTab === 'due' ? await getDuePosts() : await getReviewedPosts();
+        activeTab === 'due'
+          ? await getDuePosts(selectedTag)
+          : await getReviewedPosts(selectedTag);
       setPosts(data);
+
+      const tags = await getAllTags();
+      setAvailableTags(tags);
     } catch (error) {
       console.error('Failed to load feed:', error);
     }
-  }, [activeTab]);
+  }, [activeTab, selectedTag]);
 
   /**
-   * Background Sync Loop:
-   * Periodically checks for posts that are still processing (isProcessed = 0)
-   * and asks the webhook for the resolved media data.
+   * Optimized Background Sync:
+   * Batches all pending posts into a single request to the Make webhook.
    */
   const performBackgroundSync = useCallback(async () => {
     const webhookUrl = await getSetting('make_webhook_url');
@@ -53,30 +66,31 @@ export const FeedScreen = () => {
     const pending = await getPendingPosts();
     if (pending.length === 0) return;
 
-    for (const post of pending) {
-      try {
-        const response = await sendToMake(webhookUrl, {
-          action: 'sync',
-          postId: post.id,
-          instagramUrl: post.instagramUrl
-        });
+    try {
+      const response = await sendToMake(webhookUrl, {
+        action: 'sync_batch',
+        items: pending.map((p) => ({ id: p.id, url: p.instagramUrl }))
+      });
 
-        if (response.status === 'success' && response.mediaData) {
-          await updatePostMedia(post.id, response.mediaData);
-          loadFeed(); // Refresh UI once media is ready
+      if (response.status === 'success' && response.results) {
+        let hasUpdates = false;
+        for (const [postId, result] of Object.entries(response.results)) {
+          if (result.status === 'success' && result.mediaData) {
+            await updatePostMedia(Number(postId), result.mediaData);
+            hasUpdates = true;
+          }
         }
-      } catch (e) {
-        // Silent fail for background sync to avoid annoying the user
+        if (hasUpdates) loadFeed();
       }
+    } catch (e) {
+      // Silent fail for polling
     }
   }, [loadFeed]);
 
   useEffect(() => {
     loadFeed();
-
-    // Start polling every 10 seconds when screen is mounted
+    // Poll every 10 seconds while the app is foregrounded
     syncInterval.current = setInterval(performBackgroundSync, 10000);
-
     return () => {
       if (syncInterval.current) clearInterval(syncInterval.current);
     };
@@ -84,7 +98,7 @@ export const FeedScreen = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await performBackgroundSync(); // Trigger an immediate sync on pull-to-refresh
+    await performBackgroundSync();
     await loadFeed();
     setRefreshing(false);
   };
@@ -139,6 +153,54 @@ export const FeedScreen = () => {
         </TouchableOpacity>
       </View>
 
+      {availableTags.length > 0 && (
+        <View style={styles.tagBarContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tagScroll}
+          >
+            <TouchableOpacity
+              onPress={() => setSelectedTag(null)}
+              style={[styles.tagChip, !selectedTag && styles.tagChipActive]}
+            >
+              <Text
+                style={[
+                  styles.tagChipText,
+                  !selectedTag && styles.tagChipTextActive
+                ]}
+              >
+                All
+              </Text>
+            </TouchableOpacity>
+            {availableTags.map((tag) => (
+              <TouchableOpacity
+                key={tag}
+                onPress={() => setSelectedTag(tag === selectedTag ? null : tag)}
+                style={[
+                  styles.tagChip,
+                  selectedTag === tag && styles.tagChipActive
+                ]}
+              >
+                <TagIcon
+                  size={12}
+                  color={selectedTag === tag ? '#fff' : '#4b5563'}
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={[
+                    styles.tagChipText,
+                    selectedTag === tag && styles.tagChipTextActive
+                  ]}
+                >
+                  {tag}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       <FlatList
         data={posts}
         keyExtractor={(item) => `${activeTab}-${item.id}`}
@@ -172,7 +234,10 @@ export const FeedScreen = () => {
 
       <SettingsModal
         visible={settingsVisible}
-        onClose={() => setSettingsVisible(false)}
+        onClose={() => {
+          setSettingsVisible(false);
+          loadFeed();
+        }}
       />
     </View>
   );
@@ -229,6 +294,38 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: '#000'
+  },
+  tagBarContainer: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+    backgroundColor: '#fafafa'
+  },
+  tagScroll: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8
+  },
+  tagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb'
+  },
+  tagChipActive: {
+    backgroundColor: '#000',
+    borderColor: '#000'
+  },
+  tagChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4b5563'
+  },
+  tagChipTextActive: {
+    color: '#fff'
   },
   empty: {
     flex: 1,
