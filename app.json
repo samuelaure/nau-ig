@@ -5,26 +5,43 @@
     "scheme": "nau-ig",
     "version": "1.0.0",
     "orientation": "portrait",
-    "platforms": ["android"],
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
     "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
+      "supportsTablet": true,
       "bundleIdentifier": "com.nau.ig"
     },
     "android": {
-      "package": "com.nau.ig",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "intentFilters": [
+      "package": "com.nau.ig"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "./plugins/withAndroidShareIntentFix.js",
+      [
+        "expo-share-intent",
         {
-          "action": "SEND",
-          "data": [{ "mimeType": "text/plain" }],
-          "category": ["DEFAULT"]
+          "ios": {
+            "activationRules": {
+              "NSExtensionActivationSupportsText": true,
+              "NSExtensionActivationSupportsWebURLWithMaxCount": 1
+            }
+          }
         }
       ]
-    },
-    "plugins": []
+    ]
   }
 }
