@@ -20,14 +20,22 @@ export interface Post {
   frequency: string;
 }
 
-export const getDuePosts = (): Promise<Post[]> => {
+export const getDuePosts = (tagFilter?: string | null): Promise<Post[]> => {
   return new Promise((resolve, reject) => {
     db.transaction((tx) => {
+      let query = `SELECT * FROM posts WHERE (next_review_at <= datetime('now') OR next_review_at IS NULL)`;
+      const params: any[] = [];
+
+      if (tagFilter) {
+        query += ` AND tags LIKE ?`;
+        params.push(`%${tagFilter}%`);
+      }
+
+      query += ` ORDER BY next_review_at ASC`;
+
       tx.executeSql(
-        `SELECT * FROM posts 
-         WHERE (next_review_at <= datetime('now') OR next_review_at IS NULL) 
-         ORDER BY next_review_at ASC`,
-        [],
+        query,
+        params,
         (_, { rows }) => resolve(rows._array),
         (_, err) => {
           reject(err);
@@ -38,17 +46,57 @@ export const getDuePosts = (): Promise<Post[]> => {
   });
 };
 
-export const getReviewedPosts = (): Promise<Post[]> => {
+export const getReviewedPosts = (
+  tagFilter?: string | null
+): Promise<Post[]> => {
   return new Promise((resolve, reject) => {
     db.transaction((tx) => {
+      let query = `SELECT * FROM posts WHERE next_review_at > datetime('now')`;
+      const params: any[] = [];
+
+      if (tagFilter) {
+        query += ` AND tags LIKE ?`;
+        params.push(`%${tagFilter}%`);
+      }
+
+      query += ` ORDER BY next_review_at DESC`;
+
       tx.executeSql(
-        `SELECT * FROM posts 
-         WHERE next_review_at > datetime('now') 
-         ORDER BY next_review_at DESC`,
-        [],
+        query,
+        params,
         (_, { rows }) => resolve(rows._array),
         (_, err) => {
           reject(err);
+          return false;
+        }
+      );
+    });
+  });
+};
+
+/**
+ * Fetches all unique tags used across all posts to populate the Filter Bar.
+ */
+export const getAllTags = (): Promise<string[]> => {
+  return new Promise((resolve) => {
+    db.transaction((tx) => {
+      tx.executeSql(
+        `SELECT tags FROM posts WHERE tags IS NOT NULL`,
+        [],
+        (_, { rows }) => {
+          const allTags = new Set<string>();
+          rows._array.forEach((row) => {
+            try {
+              const tags: string[] = JSON.parse(row.tags);
+              tags.forEach((t) => allTags.add(t));
+            } catch (e) {
+              /* ignore parse errors */
+            }
+          });
+          resolve(Array.from(allTags));
+        },
+        () => {
+          resolve([]);
           return false;
         }
       );
@@ -100,6 +148,22 @@ export const updatePostNote = (id: number, content: string): Promise<void> => {
       tx.executeSql(
         `UPDATE posts SET content = ? WHERE id = ?`,
         [content, id],
+        () => resolve(),
+        (_, err) => {
+          reject(err);
+          return false;
+        }
+      );
+    });
+  });
+};
+
+export const deletePost = (id: number): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction((tx) => {
+      tx.executeSql(
+        `DELETE FROM posts WHERE id = ?`,
+        [id],
         () => resolve(),
         (_, err) => {
           reject(err);
