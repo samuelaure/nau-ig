@@ -7,24 +7,28 @@ const { withAndroidManifest } = require('@expo/config-plugins');
  */
 module.exports = function withAndroidShareIntentFix(config) {
   return withAndroidManifest(config, (config) => {
-    const mainActivity = config.modResults.manifest.application[0].activity.find(
-      (a) => a.$['android:name'] === '.MainActivity'
-    );
+    const mainActivity =
+      config.modResults.manifest.application[0].activity.find(
+        (a) => a.$['android:name'] === '.MainActivity'
+      );
 
     if (mainActivity) {
       // 1. Ensure launchMode is singleTask so the app doesn't restart on share.
-      // This allows the app to stay in the background or open as a layer 
+      // This allows the app to stay in the background or open as a layer
       // without killing the host app (Instagram).
       mainActivity.$['android:launchMode'] = 'singleTask';
 
       // 2. Clear existing SEND intent filters to prevent duplicates or malformed ones.
       if (mainActivity['intent-filter']) {
-        mainActivity['intent-filter'] = mainActivity['intent-filter'].filter((filter) => {
-          const hasSendAction = filter.action?.some(
-            (action) => action.$['android:name'] === 'android.intent.action.SEND'
-          );
-          return !hasSendAction;
-        });
+        mainActivity['intent-filter'] = mainActivity['intent-filter'].filter(
+          (filter) => {
+            const hasSendAction = filter.action?.some(
+              (action) =>
+                action.$['android:name'] === 'android.intent.action.SEND'
+            );
+            return !hasSendAction;
+          }
+        );
       } else {
         mainActivity['intent-filter'] = [];
       }
@@ -32,15 +36,19 @@ module.exports = function withAndroidShareIntentFix(config) {
       // 3. Manually add the correct SEND intent filter for text/URLs (Instagram shares URLs as text).
       mainActivity['intent-filter'].push({
         action: [{ $: { 'android:name': 'android.intent.action.SEND' } }],
-        category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }],
-        data: [{ $: { 'android:mimeType': 'text/plain' } }],
+        category: [
+          { $: { 'android:name': 'android.intent.category.DEFAULT' } }
+        ],
+        data: [{ $: { 'android:mimeType': 'text/plain' } }]
       });
-      
+
       // 4. Add support for images as well, just in case.
       mainActivity['intent-filter'].push({
         action: [{ $: { 'android:name': 'android.intent.action.SEND' } }],
-        category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }],
-        data: [{ $: { 'android:mimeType': 'image/*' } }],
+        category: [
+          { $: { 'android:name': 'android.intent.category.DEFAULT' } }
+        ],
+        data: [{ $: { 'android:mimeType': 'image/*' } }]
       });
     }
 
