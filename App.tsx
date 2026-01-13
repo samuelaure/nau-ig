@@ -1,52 +1,49 @@
-import React from 'react';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import React, { useEffect } from 'react';
+import { View, StyleSheet } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import {
   ShareIntentProvider,
-  useShareIntent
-} from './src/providers/ShareIntentProvider';
-import { ShareIntentModal } from './src/components/ShareIntentModal';
+  useShareIntentContext
+} from './src/context/ShareIntentContext';
 import { FeedScreen } from './src/screens/FeedScreen';
+import { CaptureModal } from './src/components/CaptureModal';
 import { initDb } from './src/db';
-import { StatusBar } from 'expo-status-bar';
 
-// Initialize SQLite schema
-initDb();
-
-/**
- * RootContent manages the conditional rendering to prevent "jumping"
- * when a share intent is captured.
- */
-const RootContent = () => {
-  const { value } = useShareIntent();
-
-  // If there is an active sharing value, we render ONLY the modal.
-  // This helps prevent the "app jump" feel by not rendering the full Feed background.
-  if (value && value.value) {
-    return (
-      <GestureHandlerRootView
-        style={{ flex: 1, backgroundColor: 'transparent' }}
-      >
-        <ShareIntentModal />
-      </GestureHandlerRootView>
-    );
-  }
+const MainLayout = () => {
+  const { hasShareIntent, value, resetShareIntent } = useShareIntentContext();
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <View style={styles.container}>
+      <StatusBar style="light" />
       <FeedScreen />
-      <ShareIntentModal />
-    </GestureHandlerRootView>
+      {hasShareIntent && (
+        <CaptureModal shareValue={value} onClose={resetShareIntent} />
+      )}
+    </View>
   );
 };
 
 export default function App() {
+  useEffect(() => {
+    (async () => {
+      try {
+        await initDb();
+      } catch (err) {
+        console.error('DB Init Error:', err);
+      }
+    })();
+  }, []);
+
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" translucent backgroundColor="transparent" />
-      <ShareIntentProvider>
-        <RootContent />
-      </ShareIntentProvider>
-    </SafeAreaProvider>
+    <ShareIntentProvider>
+      <MainLayout />
+    </ShareIntentProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000'
+  }
+});

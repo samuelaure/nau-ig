@@ -22,7 +22,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.nau.ig"
+      "package": "com.nau.ig",
+      "launchMode": "singleTask"
     },
     "web": {
       "favicon": "./assets/favicon.png"

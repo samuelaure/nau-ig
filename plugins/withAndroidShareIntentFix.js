@@ -13,12 +13,10 @@ module.exports = function withAndroidShareIntentFix(config) {
       );
 
     if (mainActivity) {
-      // 1. Ensure launchMode is singleTask so the app doesn't restart on share.
-      // This allows the app to stay in the background or open as a layer
-      // without killing the host app (Instagram).
+      // Force singleTask to ensure the app instance is reused
       mainActivity.$['android:launchMode'] = 'singleTask';
 
-      // 2. Clear existing SEND intent filters to prevent duplicates or malformed ones.
+      // Clear existing SEND intent filters to avoid malformed [object Object]
       if (mainActivity['intent-filter']) {
         mainActivity['intent-filter'] = mainActivity['intent-filter'].filter(
           (filter) => {
@@ -29,26 +27,15 @@ module.exports = function withAndroidShareIntentFix(config) {
             return !hasSendAction;
           }
         );
-      } else {
-        mainActivity['intent-filter'] = [];
       }
 
-      // 3. Manually add the correct SEND intent filter for text/URLs (Instagram shares URLs as text).
+      // Re-inject clean intent filters
       mainActivity['intent-filter'].push({
         action: [{ $: { 'android:name': 'android.intent.action.SEND' } }],
         category: [
           { $: { 'android:name': 'android.intent.category.DEFAULT' } }
         ],
         data: [{ $: { 'android:mimeType': 'text/plain' } }]
-      });
-
-      // 4. Add support for images as well, just in case.
-      mainActivity['intent-filter'].push({
-        action: [{ $: { 'android:name': 'android.intent.action.SEND' } }],
-        category: [
-          { $: { 'android:name': 'android.intent.category.DEFAULT' } }
-        ],
-        data: [{ $: { 'android:mimeType': 'image/*' } }]
       });
     }
 
