@@ -1,16 +1,20 @@
 {
-  "name": "9nau-ig",
+  "name": "nau-ig",
   "version": "1.0.0",
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
-    "apk": "cd android && gradlew assembleRelease",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "prebuild": "expo prebuild",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx --fix --cache",
     "format": "prettier --write .",
-    "eas:apk": "eas build -p android --profile preview"
+    "format:check": "prettier --check .",
+    "type-check": "tsc --noEmit",
+    "clean": "expo-cli cache:clear && rimraf node_modules",
+    "build:local": "npm run prebuild && cd android && gradlew assembleRelease",
+    "build:preview": "eas build -p android --profile preview"
   },
   "dependencies": {
     "expo": "~50.0.6",
@@ -41,6 +45,7 @@
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-native": "^4.1.0",
     "prettier": "^3.2.4",
+    "rimraf": "^5.0.5",
     "typescript": "^5.3.3"
   },
   "private": true
