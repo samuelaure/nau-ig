@@ -29,6 +29,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "./plugins/withAndroidShareTarget.js",
       [
         "expo-share-intent",
         {
@@ -39,8 +40,7 @@
             }
           }
         }
-      ],
-      "./plugins/withAndroidShareTarget.js"
+      ]
     ]
   }
 }

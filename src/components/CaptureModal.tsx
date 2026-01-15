@@ -140,11 +140,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
       style={styles.container}
     >
       <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
-        <TouchableOpacity
-          style={StyleSheet.absoluteFill}
-          onPress={handleClose}
-          activeOpacity={1}
-        />
+        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={handleClose} activeOpacity={1} />
       </Animated.View>
 
       <Animated.View
@@ -152,8 +148,8 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
           styles.dialog,
           {
             opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }]
-          }
+            transform: [{ translateY: slideAnim }],
+          },
         ]}
       >
         <View style={styles.header}>
@@ -162,7 +158,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
             <View style={styles.linkContainer}>
               <LinkIcon size={12} color="#9ca3af" />
               <Text style={styles.subtitle} numberOfLines={1}>
-                {shareValue.replace('https://', '').replace('www.', '')}
+                {shareValue?.replace('https://', '').replace('www.', '') || 'No URL'}
               </Text>
             </View>
           </View>
@@ -175,10 +171,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.inputSection}>
             <TextInput
               style={styles.noteInput}
@@ -224,7 +217,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
                   ))}
                 </View>
               )}
-              {existingTags.filter(t => !selectedTags.includes(t)).length > 0 && (
+              {existingTags.filter((t) => !selectedTags.includes(t)).length > 0 && (
                 <View style={styles.tagGroup}>
                   {existingTags
                     .filter((t) => !selectedTags.includes(t))

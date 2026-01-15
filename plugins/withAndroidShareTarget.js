@@ -29,7 +29,11 @@ function withAndroidShareTarget(config) {
           if (!Array.isArray(filters)) filters = [filters];
 
           activity['intent-filter'] = filters.filter((filter) => {
-            const actions = Array.isArray(filter.action) ? filter.action : (filter.action ? [filter.action] : []);
+            const actions = Array.isArray(filter.action)
+              ? filter.action
+              : filter.action
+                ? [filter.action]
+                : [];
             const hasSendAction = actions.some((action) => {
               const actionName = action?.$?.['android:name'];
               return (
@@ -37,6 +41,12 @@ function withAndroidShareTarget(config) {
                 actionName === 'android.intent.action.SEND_MULTIPLE'
               );
             });
+
+            // LOG FOR DEBUGGING - this will show up in prebuild logs
+            if (hasSendAction) {
+              console.log(`[withAndroidShareTarget] Removing SEND intent from ${name}`);
+            }
+
             return !hasSendAction;
           });
         }
@@ -70,8 +80,8 @@ function withAndroidShareTarget(config) {
       ],
     };
 
-    const existingCaptureIdx = activities.findIndex(
-      (a) => a.$['android:name']?.endsWith('.CaptureActivity'),
+    const existingCaptureIdx = activities.findIndex((a) =>
+      a.$['android:name']?.endsWith('.CaptureActivity'),
     );
 
     if (existingCaptureIdx > -1) {
