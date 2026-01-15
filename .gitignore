@@ -59,6 +59,8 @@ ios/.xcode.env.local
 *.iml
 *.sublime-project
 *.sublime-workspace
+.cursorrules
+.agent/
 
 # Environment variables
 .env

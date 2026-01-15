@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   BackHandler,
+  Animated,
+  Dimensions,
 } from 'react-native';
-import { Save, X, Hash, Clock, Plus } from 'lucide-react-native';
+import { Save, X, Hash, Clock, Plus, Link as LinkIcon, Check } from 'lucide-react-native';
 import { savePost, getAllTags } from '@/repositories/PostRepository';
 import { getSetting } from '@/repositories/SettingsRepository';
 import { sendToMake } from '@/services/SyncService';
@@ -24,9 +26,9 @@ interface CaptureModalProps {
 }
 
 const FREQUENCIES = [
-  { id: 'daily', label: 'Daily', interval: 1 },
-  { id: 'weekly', label: 'Weekly', interval: 7 },
-  { id: 'monthly', label: 'Monthly', interval: 30 },
+  { id: 'daily', label: 'Daily' },
+  { id: 'weekly', label: 'Weekly' },
+  { id: 'monthly', label: 'Monthly' },
 ];
 
 export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose }) => {
@@ -37,8 +39,23 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
   const [isSaving, setIsSaving] = useState(false);
   const [existingTags, setExistingTags] = useState<string[]>([]);
 
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
   useEffect(() => {
     loadExistingTags();
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
   const loadExistingTags = async () => {
@@ -62,12 +79,31 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
     }
   };
 
+  const handleClose = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 20,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onClose();
+      if (Platform.OS === 'android') {
+        BackHandler.exitApp();
+      }
+    });
+  };
+
   const handleSave = async () => {
     if (!shareValue) return;
 
     setIsSaving(true);
     try {
-      // 1. Save to Local Database first
       const postId = await savePost({
         instagramUrl: shareValue,
         title: 'Instagram Capture',
@@ -76,7 +112,6 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
         frequency: frequency,
       });
 
-      // 2. Attempt Webhook Trigger
       const webhookUrl = await getSetting('make_webhook_url');
       if (webhookUrl) {
         try {
@@ -86,15 +121,11 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
             postId: postId,
           });
         } catch (webhookErr) {
-          console.warn('Webhook failed, relying on background sync:', webhookErr);
+          console.warn('Webhook failed:', webhookErr);
         }
       }
 
-      onClose();
-      // On Android, we exit the activity to return to the source app (e.g. Instagram)
-      if (Platform.OS === 'android') {
-        BackHandler.exitApp();
-      }
+      handleClose();
     } catch (err) {
       console.error('Save error:', err);
       Alert.alert('Save Error', 'Failed to save the content. Please try again.');
@@ -105,218 +136,275 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
     >
-      <View style={styles.dialog}>
+      <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={handleClose}
+          activeOpacity={1}
+        />
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.dialog,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
         <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>Capture Content</Text>
-            <Text style={styles.subtitle} numberOfLines={1}>
-              From: {shareValue}
-            </Text>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Quick Capture</Text>
+            <View style={styles.linkContainer}>
+              <LinkIcon size={12} color="#9ca3af" />
+              <Text style={styles.subtitle} numberOfLines={1}>
+                {shareValue.replace('https://', '').replace('www.', '')}
+              </Text>
+            </View>
           </View>
           <TouchableOpacity
-            onPress={() => {
-              onClose();
-              if (Platform.OS === 'android') BackHandler.exitApp();
-            }}
+            onPress={handleClose}
             style={styles.closeButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <X color="#666" size={20} />
+            <X color="#9ca3af" size={20} />
           </TouchableOpacity>
         </View>
 
-        <TextInput
-          style={styles.noteInput}
-          placeholder="What's this about?"
-          placeholderTextColor="#9ca3af"
-          multiline
-          value={note}
-          onChangeText={setNote}
-          autoFocus
-        />
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Hash size={16} color={COLORS.textSecondary} />
-            <Text style={styles.sectionTitle}>Tags</Text>
-          </View>
-          <View style={styles.tagInputContainer}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.inputSection}>
             <TextInput
-              style={styles.tagInput}
-              placeholder="Add tag..."
-              value={newTag}
-              onChangeText={setNewTag}
-              onSubmitEditing={addNewTag}
+              style={styles.noteInput}
+              placeholder="Add your thoughts or notes..."
+              placeholderTextColor="#9ca3af"
+              multiline
+              value={note}
+              onChangeText={setNote}
+              autoFocus
             />
-            <TouchableOpacity onPress={addNewTag} style={styles.addTagButton}>
-              <Plus size={20} color={COLORS.primary} />
-            </TouchableOpacity>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagList}>
-            {selectedTags.map((tag) => (
-              <TouchableOpacity
-                key={tag}
-                onPress={() => toggleTag(tag)}
-                style={[styles.tagChip, styles.tagChipActive]}
-              >
-                <Text style={styles.tagChipTextActive}>{tag}</Text>
-              </TouchableOpacity>
-            ))}
-            {existingTags
-              .filter((t) => !selectedTags.includes(t))
-              .map((tag) => (
-                <TouchableOpacity key={tag} onPress={() => toggleTag(tag)} style={styles.tagChip}>
-                  <Text style={styles.tagChipText}>{tag}</Text>
-                </TouchableOpacity>
-              ))}
-          </ScrollView>
-        </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Clock size={16} color={COLORS.textSecondary} />
-            <Text style={styles.sectionTitle}>Review Frequency</Text>
-          </View>
-          <View style={styles.freqContainer}>
-            {FREQUENCIES.map((f) => (
-              <TouchableOpacity
-                key={f.id}
-                onPress={() => setFrequency(f.id)}
-                style={[styles.freqButton, frequency === f.id && styles.freqButtonActive]}
-              >
-                <Text style={[styles.freqText, frequency === f.id && styles.freqTextActive]}>
-                  {f.label}
-                </Text>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Hash size={14} color={COLORS.textSecondary} />
+              <Text style={styles.sectionTitle}>Contextual Tags</Text>
+            </View>
+            <View style={styles.tagInputContainer}>
+              <TextInput
+                style={styles.tagInput}
+                placeholder="Type tag name..."
+                placeholderTextColor="#9ca3af"
+                value={newTag}
+                onChangeText={setNewTag}
+                onSubmitEditing={addNewTag}
+              />
+              <TouchableOpacity onPress={addNewTag} style={styles.addTagIcon}>
+                <Plus size={18} color={COLORS.primary} />
               </TouchableOpacity>
-            ))}
+            </View>
+            <View style={styles.tagCloud}>
+              {selectedTags.length > 0 && (
+                <View style={styles.tagGroup}>
+                  {selectedTags.map((tag) => (
+                    <TouchableOpacity
+                      key={tag}
+                      onPress={() => toggleTag(tag)}
+                      style={[styles.tagChip, styles.tagChipActive]}
+                    >
+                      <Text style={styles.tagChipTextActive}>{tag}</Text>
+                      <X size={10} color="#fff" style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              {existingTags.filter(t => !selectedTags.includes(t)).length > 0 && (
+                <View style={styles.tagGroup}>
+                  {existingTags
+                    .filter((t) => !selectedTags.includes(t))
+                    .map((tag) => (
+                      <TouchableOpacity
+                        key={tag}
+                        onPress={() => toggleTag(tag)}
+                        style={styles.tagChip}
+                      >
+                        <Text style={styles.tagChipText}># {tag}</Text>
+                      </TouchableOpacity>
+                    ))}
+                </View>
+              )}
+            </View>
           </View>
-        </View>
 
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={isSaving}>
-          {isSaving ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <>
-              <Save color="#fff" size={20} />
-              <Text style={styles.saveText}>Save</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Clock size={14} color={COLORS.textSecondary} />
+              <Text style={styles.sectionTitle}>Spaced Repetition</Text>
+            </View>
+            <View style={styles.freqContainer}>
+              {FREQUENCIES.map((f) => {
+                const isActive = frequency === f.id;
+                return (
+                  <TouchableOpacity
+                    key={f.id}
+                    onPress={() => setFrequency(f.id)}
+                    style={[styles.freqButton, isActive && styles.freqButtonActive]}
+                  >
+                    {isActive && <Check size={12} color="#fff" style={{ marginRight: 4 }} />}
+                    <Text style={[styles.freqText, isActive && styles.freqTextActive]}>
+                      {f.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+            onPress={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Save color="#fff" size={18} />
+                <Text style={styles.saveText}>Capture to Loop</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  addTagButton: {
-    paddingHorizontal: 12,
-  },
-  closeButton: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 20,
-    padding: 8,
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   container: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
     flex: 1,
     justifyContent: 'center',
     padding: 20,
   },
   dialog: {
     backgroundColor: '#fff',
-    borderRadius: 30,
+    borderRadius: 24,
     elevation: 24,
+    maxHeight: '80%',
     maxWidth: 400,
+    overflow: 'hidden',
     padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
     width: '100%',
   },
-  freqButton: {
-    alignItems: 'center',
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    flex: 1,
-    paddingVertical: 10,
-  },
-  freqButtonActive: {
-    backgroundColor: '#000',
-  },
-  freqContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  freqText: {
-    color: '#4b5563',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  freqTextActive: {
-    color: '#fff',
-  },
   header: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  headerText: {
+    flex: 1,
+  },
+  title: {
+    color: '#111827',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  linkContainer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  subtitle: {
+    color: '#6b7280',
+    fontSize: 12,
+    marginLeft: 4,
+    maxWidth: '90%',
+  },
+  closeButton: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 20,
+    padding: 6,
+  },
+  inputSection: {
+    marginBottom: 16,
   },
   noteInput: {
     backgroundColor: '#f9fafb',
     borderRadius: 16,
     color: '#111827',
-    fontSize: 16,
-    height: 100,
-    marginBottom: 20,
+    fontSize: 15,
+    minHeight: 80,
     padding: 16,
     textAlignVertical: 'top',
   },
-  saveButton: {
-    alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    borderRadius: 18,
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'center',
-    marginTop: 10,
-    padding: 16,
-  },
-  saveText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
   section: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 6,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   sectionTitle: {
     color: COLORS.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
     textTransform: 'uppercase',
   },
-  subtitle: {
-    color: '#6b7280',
-    fontSize: 12,
-    marginTop: 2,
-    maxWidth: 200,
+  tagInputContainer: {
+    alignItems: 'center',
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    flexDirection: 'row',
+    marginBottom: 8,
+    paddingHorizontal: 12,
+  },
+  tagInput: {
+    color: '#111827',
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 10,
+  },
+  addTagIcon: {
+    paddingLeft: 8,
+  },
+  tagCloud: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  tagGroup: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 4,
   },
   tagChip: {
+    alignItems: 'center',
     backgroundColor: '#f3f4f6',
-    borderRadius: 10,
-    marginRight: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderRadius: 8,
+    flexDirection: 'row',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   tagChipActive: {
     backgroundColor: COLORS.primary,
@@ -331,27 +419,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  tagInput: {
-    color: '#111827',
-    flex: 1,
-    fontSize: 14,
-    paddingVertical: 8,
+  freqContainer: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  tagInputContainer: {
+  freqButton: {
     alignItems: 'center',
     backgroundColor: '#f9fafb',
     borderRadius: 12,
+    flex: 1,
     flexDirection: 'row',
-    marginBottom: 8,
-    paddingLeft: 12,
+    justifyContent: 'center',
+    paddingVertical: 10,
   },
-  tagList: {
+  freqButtonActive: {
+    backgroundColor: '#111827',
+  },
+  freqText: {
+    color: '#4b5563',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  freqTextActive: {
+    color: '#fff',
+  },
+  footer: {
+    marginTop: 8,
+  },
+  saveButton: {
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    borderRadius: 16,
     flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    padding: 16,
   },
-  title: {
-    color: '#000',
-    fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: -0.5,
+  saveButtonDisabled: {
+    opacity: 0.7,
+  },
+  saveText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
   },
 });

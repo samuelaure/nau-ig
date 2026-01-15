@@ -18,27 +18,35 @@ function withAndroidShareTarget(config) {
     const application = manifest.application[0];
     const activities = application.activity || [];
 
-    // Find and Clean MainActivity
-    const mainActivity = activities.find(
-      (a) => a.$['android:name'] === '.MainActivity' || a.$['android:name']?.endsWith('.MainActivity'),
-    );
+    // Aggressively remove all SEND/SEND_MULTIPLE filters from ALL activities EXCEPT CaptureActivity
+    activities.forEach((activity) => {
+      const name = activity.$['android:name'] || '';
 
-    if (mainActivity) {
-      // Ensure it's singleTask
-      mainActivity.$['android:launchMode'] = 'singleTask';
+      // We only want SEND/SEND_MULTIPLE on CaptureActivity
+      if (!name.endsWith('.CaptureActivity')) {
+        let filters = activity['intent-filter'];
+        if (filters) {
+          if (!Array.isArray(filters)) filters = [filters];
 
-      // Aggressively remove all SEND/SEND_MULTIPLE filters from MainActivity
-      if (mainActivity['intent-filter']) {
-        mainActivity['intent-filter'] = mainActivity['intent-filter'].filter((filter) => {
-          const actions = Array.isArray(filter.action) ? filter.action : [filter.action];
-          const hasSendAction = actions.some((action) => {
-            const name = action?.$?.['android:name'];
-            return name === 'android.intent.action.SEND' || name === 'android.intent.action.SEND_MULTIPLE';
+          activity['intent-filter'] = filters.filter((filter) => {
+            const actions = Array.isArray(filter.action) ? filter.action : (filter.action ? [filter.action] : []);
+            const hasSendAction = actions.some((action) => {
+              const actionName = action?.$?.['android:name'];
+              return (
+                actionName === 'android.intent.action.SEND' ||
+                actionName === 'android.intent.action.SEND_MULTIPLE'
+              );
+            });
+            return !hasSendAction;
           });
-          return !hasSendAction;
-        });
+        }
       }
-    }
+
+      // Ensure MainActivity remains singleTask
+      if (name.endsWith('.MainActivity')) {
+        activity.$['android:launchMode'] = 'singleTask';
+      }
+    });
 
     // Add or Update CaptureActivity (The Dialog View)
     const captureActivityProps = {
@@ -54,6 +62,7 @@ function withAndroidShareTarget(config) {
       },
       'intent-filter': [
         {
+          $: { 'android:label': config.name || '9naŭ IG' },
           action: [{ $: { 'android:name': 'android.intent.action.SEND' } }],
           category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }],
           data: [{ $: { 'android:mimeType': 'text/plain' } }],
@@ -62,8 +71,9 @@ function withAndroidShareTarget(config) {
     };
 
     const existingCaptureIdx = activities.findIndex(
-      (a) => a.$['android:name'] === '.CaptureActivity',
+      (a) => a.$['android:name']?.endsWith('.CaptureActivity'),
     );
+
     if (existingCaptureIdx > -1) {
       activities[existingCaptureIdx] = captureActivityProps;
     } else {
