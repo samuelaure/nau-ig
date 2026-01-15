@@ -10,14 +10,17 @@ const db = SQLite.openDatabase(DATABASE_NAME);
 export const executeSql = <T = any>(sql: string, params: any[] = []): Promise<T[]> => {
   return new Promise((resolve, reject) => {
     db.transaction((tx) => {
+      console.log('[DB] Executing SQL:', sql, 'params:', params);
       tx.executeSql(
         sql,
         params,
         (_, { rows }) => {
-          // rows._array is a legacy way to get all rows as an array
-          resolve((rows as any)._array || []);
+          const result = (rows as any)._array || [];
+          console.log('[DB] SQL Success. Rows returned:', result.length);
+          resolve(result);
         },
         (_, err) => {
+          console.error('[DB] SQL Error:', err, 'SQL:', sql);
           reject(err);
           return false;
         },
@@ -32,13 +35,17 @@ export const executeSql = <T = any>(sql: string, params: any[] = []): Promise<T[
 export const runSql = (sql: string, params: any[] = []): Promise<number> => {
   return new Promise((resolve, reject) => {
     db.transaction((tx) => {
+      console.log('[DB] Running SQL (no rows):', sql, 'params:', params);
       tx.executeSql(
         sql,
         params,
         (_, result) => {
-          resolve(result.insertId || result.rowsAffected || 0);
+          const res = result.insertId || result.rowsAffected || 0;
+          console.log('[DB] Run SQL success. Result (ID/Affected):', res);
+          resolve(res);
         },
         (_, err) => {
+          console.error('[DB] Run SQL error:', err, 'SQL:', sql);
           reject(err);
           return false;
         },

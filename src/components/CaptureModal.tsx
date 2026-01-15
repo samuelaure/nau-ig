@@ -141,40 +141,49 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
   };
 
   const handleSave = async () => {
-    if (!shareValue) return;
+    if (!shareValue) {
+      console.error('[CaptureModal] Cannot save: shareValue is missing');
+      return;
+    }
 
+    console.log('[CaptureModal] handleSave started. shareValue:', shareValue);
     setIsSaving(true);
     try {
-      const postId = await savePost({
+      const postData = {
         instagramUrl: shareValue,
         title: title || 'Instagram Capture',
         content: note,
         tags: selectedTags,
         frequency: `${repeatInterval} ${repeatUnit}`,
         startDate: startDate,
-      });
+      };
+
+      console.log('[CaptureModal] Attempting to savePost with:', postData);
+      const postId = await savePost(postData);
+      console.log('[CaptureModal] savePost success. postId:', postId);
 
       const webhookUrl = await getSetting('make_webhook_url');
       if (webhookUrl) {
-        try {
-          await sendToMake(webhookUrl, {
-            action: 'capture',
-            instagramUrl: shareValue,
-            postId: postId,
-          });
-        } catch (webhookErr) {
-          console.warn('Webhook failed:', webhookErr);
-        }
+        console.log('[CaptureModal] Triggering webhook (async)...');
+        // Do NOT await the webhook so the UI closes immediately
+        sendToMake(webhookUrl, {
+          action: 'capture',
+          instagramUrl: shareValue,
+          postId: postId,
+        }).then(() => console.log('[CaptureModal] Webhook async success'))
+          .catch(err => console.warn('[CaptureModal] Webhook async failed:', err));
       }
 
+      console.log('[CaptureModal] Showing success toast');
       if (Platform.OS === 'android') {
         ToastAndroid.show('Capture Saved!', ToastAndroid.SHORT);
       }
 
+      console.log('[CaptureModal] Closing modal');
       handleClose();
     } catch (err) {
-      console.error('Save error:', err);
-      Alert.alert('Save Error', 'Failed to save the content. Please try again.');
+      console.error('[CaptureModal] CRITICAL SAVE ERROR:', err);
+      Alert.alert('Save Error', 'Failed to save the content. Check console for details.');
     } finally {
       setIsSaving(false);
     }

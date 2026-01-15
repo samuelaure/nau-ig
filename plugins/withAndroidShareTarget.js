@@ -65,6 +65,7 @@ function withAndroidShareTarget(config) {
         'android:label': config.name || '9naŭ IG',
         'android:theme': '@style/AppTheme.CaptureDialog',
         'android:excludeFromRecents': 'true',
+        'android:launchMode': 'singleTop',
         'android:documentLaunchMode': 'always',
         'android:taskAffinity': '', // Important for keeping it separate from Main Task
         'android:exported': 'true',
@@ -111,6 +112,7 @@ function withAndroidShareTarget(config) {
           { $: { name: 'android:windowNoTitle' }, _: 'true' },
           { $: { name: 'android:windowIsFloating' }, _: 'false' },
           { $: { name: 'android:backgroundDimEnabled' }, _: 'false' },
+          { $: { name: 'android:windowAnimationStyle' }, _: '@null' },
         ],
       });
     }
@@ -156,6 +158,7 @@ class CaptureActivity : ReactActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        android.util.Log.d("CaptureActivity", "onNewIntent: \${intent?.action}")
     }
 
     override fun getMainComponentName(): String = "main"

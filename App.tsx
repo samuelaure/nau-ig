@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ShareIntentProvider, useShareIntentContext } from '@/context/ShareIntentContext';
 import { FeedScreen } from '@/screens/FeedScreen';
 import { CaptureModal } from '@/components/CaptureModal';
 import { initDb } from '@/db';
+import { COLORS } from '@/constants';
 
 const MainLayout = ({ isCapture }: { isCapture?: boolean }) => {
   const { hasShareIntent, value, resetShareIntent } = useShareIntentContext();
@@ -21,20 +22,24 @@ const MainLayout = ({ isCapture }: { isCapture?: boolean }) => {
    * the CaptureModal or a loading state. We never show the FeedScreen here.
    */
   if (isCapture) {
-    if (hasShareIntent) {
-      return (
-        <View style={styles.shareOverlay}>
-          <StatusBar style="dark" />
-          <CaptureModal shareValue={value} onClose={resetShareIntent} />
-        </View>
-      );
-    }
-
-    // While waiting for the intent to be processed by the library
     return (
       <View style={styles.shareOverlay}>
         <StatusBar style="dark" />
-        {/* Transparent loading state or a subtle spinner could go here if needed */}
+        {hasShareIntent ? (
+          <CaptureModal shareValue={value || ''} onClose={resetShareIntent} />
+        ) : (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.loadingText}>Waiting for share intent...</Text>
+            {/* Fail-safe button for debugging */}
+            <TouchableOpacity
+              style={{ marginTop: 20, padding: 10, backgroundColor: '#eee', borderRadius: 8 }}
+              onPress={() => console.log('Current state - hasIntent:', hasShareIntent, 'value:', value)}
+            >
+              <Text style={{ color: '#666' }}>Log State</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   }
@@ -50,6 +55,7 @@ const MainLayout = ({ isCapture }: { isCapture?: boolean }) => {
 
 export default function App(props: any) {
   useEffect(() => {
+    console.log('[App] Initial Props:', props);
     initDb().catch((err) => {
       console.error('CRITICAL: DB Init Error:', err);
     });
@@ -72,5 +78,16 @@ const styles = StyleSheet.create({
   shareOverlay: {
     backgroundColor: 'transparent',
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.7)', // Slight white overlay while loading
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#666',
+    fontSize: 14,
   },
 });
