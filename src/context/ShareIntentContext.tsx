@@ -8,15 +8,10 @@ interface ShareIntentContextType {
   error: string | null;
 }
 
-const ShareIntentContext = createContext<ShareIntentContextType | undefined>(
-  undefined
-);
+const ShareIntentContext = createContext<ShareIntentContextType | undefined>(undefined);
 
-export const ShareIntentProvider: React.FC<{ children: React.ReactNode }> = ({
-  children
-}) => {
-  const { hasShareIntent, shareIntent, resetShareIntent, error } =
-    useShareIntent();
+export const ShareIntentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { hasShareIntent, shareIntent, resetShareIntent, error } = useShareIntent();
   const [activeIntent, setActiveIntent] = useState<any>(null);
 
   useEffect(() => {
@@ -38,7 +33,7 @@ export const ShareIntentProvider: React.FC<{ children: React.ReactNode }> = ({
         value: activeIntent?.value,
         hasShareIntent: !!activeIntent,
         resetShareIntent: handleReset,
-        error
+        error,
       }}
     >
       {children}
@@ -48,9 +43,6 @@ export const ShareIntentProvider: React.FC<{ children: React.ReactNode }> = ({
 
 export const useShareIntentContext = () => {
   const context = useContext(ShareIntentContext);
-  if (!context)
-    throw new Error(
-      'useShareIntentContext must be used within ShareIntentProvider'
-    );
+  if (!context) throw new Error('useShareIntentContext must be used within ShareIntentProvider');
   return context;
 };

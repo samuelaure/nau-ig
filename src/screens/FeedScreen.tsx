@@ -6,27 +6,22 @@ import {
   RefreshControl,
   Text,
   TouchableOpacity,
-  ScrollView
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  Settings,
-  LayoutGrid,
-  Clock,
-  Tag as TagIcon
-} from 'lucide-react-native';
-import { FeedItem } from '../components/FeedItem';
-import { SettingsModal } from '../components/SettingsModal';
+import { Settings, LayoutGrid, Clock, Tag as TagIcon } from 'lucide-react-native';
+import { FeedItem } from '@/components/FeedItem';
+import { SettingsModal } from '@/components/SettingsModal';
 import {
   getDuePosts,
   getReviewedPosts,
   getPendingPosts,
   getAllTags,
   updatePostMedia,
-  Post
-} from '../repositories/PostRepository';
-import { getSetting } from '../storage/settings';
-import { sendToMake } from '../services/make';
+  Post,
+} from '@/repositories/PostRepository';
+import { getSetting } from '@/repositories/SettingsRepository';
+import { sendToMake } from '@/services/SyncService';
 
 type FeedTab = 'due' | 'reviewed';
 
@@ -43,9 +38,7 @@ export const FeedScreen = () => {
   const loadFeed = useCallback(async () => {
     try {
       const data =
-        activeTab === 'due'
-          ? await getDuePosts(selectedTag)
-          : await getReviewedPosts(selectedTag);
+        activeTab === 'due' ? await getDuePosts(selectedTag) : await getReviewedPosts(selectedTag);
       setPosts(data);
 
       const tags = await getAllTags();
@@ -69,7 +62,7 @@ export const FeedScreen = () => {
     try {
       const response = await sendToMake(webhookUrl, {
         action: 'sync_batch',
-        items: pending.map((p) => ({ id: p.id, url: p.instagramUrl }))
+        items: pending.map((p) => ({ id: p.id, url: p.instagramUrl })),
       });
 
       if (response.status === 'success' && response.results) {
@@ -108,10 +101,7 @@ export const FeedScreen = () => {
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
         <View style={styles.topBarSide} />
         <Text style={styles.logo}>9naŭ IG</Text>
-        <TouchableOpacity
-          style={styles.topBarSide}
-          onPress={() => setSettingsVisible(true)}
-        >
+        <TouchableOpacity style={styles.topBarSide} onPress={() => setSettingsVisible(true)}>
           <Settings size={22} color="#000" />
         </TouchableOpacity>
       </View>
@@ -121,16 +111,8 @@ export const FeedScreen = () => {
           style={[styles.tab, activeTab === 'due' && styles.activeTab]}
           onPress={() => setActiveTab('due')}
         >
-          <LayoutGrid
-            size={20}
-            color={activeTab === 'due' ? '#000' : '#9ca3af'}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'due' && styles.activeTabText
-            ]}
-          >
+          <LayoutGrid size={20} color={activeTab === 'due' ? '#000' : '#9ca3af'} />
+          <Text style={[styles.tabText, activeTab === 'due' && styles.activeTabText]}>
             To Review
           </Text>
         </TouchableOpacity>
@@ -138,16 +120,8 @@ export const FeedScreen = () => {
           style={[styles.tab, activeTab === 'reviewed' && styles.activeTab]}
           onPress={() => setActiveTab('reviewed')}
         >
-          <Clock
-            size={20}
-            color={activeTab === 'reviewed' ? '#000' : '#9ca3af'}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'reviewed' && styles.activeTabText
-            ]}
-          >
+          <Clock size={20} color={activeTab === 'reviewed' ? '#000' : '#9ca3af'} />
+          <Text style={[styles.tabText, activeTab === 'reviewed' && styles.activeTabText]}>
             History
           </Text>
         </TouchableOpacity>
@@ -164,12 +138,7 @@ export const FeedScreen = () => {
               onPress={() => setSelectedTag(null)}
               style={[styles.tagChip, !selectedTag && styles.tagChipActive]}
             >
-              <Text
-                style={[
-                  styles.tagChipText,
-                  !selectedTag && styles.tagChipTextActive
-                ]}
-              >
+              <Text style={[styles.tagChipText, !selectedTag && styles.tagChipTextActive]}>
                 All
               </Text>
             </TouchableOpacity>
@@ -177,22 +146,14 @@ export const FeedScreen = () => {
               <TouchableOpacity
                 key={tag}
                 onPress={() => setSelectedTag(tag === selectedTag ? null : tag)}
-                style={[
-                  styles.tagChip,
-                  selectedTag === tag && styles.tagChipActive
-                ]}
+                style={[styles.tagChip, selectedTag === tag && styles.tagChipActive]}
               >
                 <TagIcon
                   size={12}
                   color={selectedTag === tag ? '#fff' : '#4b5563'}
                   style={{ marginRight: 4 }}
                 />
-                <Text
-                  style={[
-                    styles.tagChipText,
-                    selectedTag === tag && styles.tagChipTextActive
-                  ]}
-                >
+                <Text style={[styles.tagChipText, selectedTag === tag && styles.tagChipTextActive]}>
                   {tag}
                 </Text>
               </TouchableOpacity>
@@ -205,21 +166,13 @@ export const FeedScreen = () => {
         data={posts}
         keyExtractor={(item) => `${activeTab}-${item.id}`}
         renderItem={({ item }) => (
-          <FeedItem
-            post={item}
-            onProcessed={loadFeed}
-            isHistory={activeTab === 'reviewed'}
-          />
+          <FeedItem post={item} onProcessed={loadFeed} isHistory={activeTab === 'reviewed'} />
         )}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyText}>
-              {activeTab === 'due'
-                ? 'You reached Review Zero!'
-                : 'No history yet.'}
+              {activeTab === 'due' ? 'You reached Review Zero!' : 'No history yet.'}
             </Text>
             <Text style={styles.emptySubText}>
               {activeTab === 'due'
@@ -244,105 +197,105 @@ export const FeedScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  activeTab: {
+    borderBottomColor: '#000',
+    borderBottomWidth: 2,
+  },
+  activeTabText: {
+    color: '#000',
+  },
   container: {
+    backgroundColor: '#fff',
     flex: 1,
-    backgroundColor: '#fff'
   },
-  topBar: {
-    flexDirection: 'row',
+  empty: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-    backgroundColor: '#fff'
+    flex: 1,
+    justifyContent: 'center',
+    marginTop: 100,
+    padding: 40,
   },
-  topBarSide: {
-    width: 40,
-    alignItems: 'flex-end',
-    justifyContent: 'center'
+  emptySubText: {
+    color: '#6b7280',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  emptyText: {
+    color: '#111827',
+    fontSize: 18,
+    fontWeight: '700',
   },
   logo: {
+    color: '#000',
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: -1,
-    color: '#000',
-    textAlign: 'center'
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6'
+    textAlign: 'center',
   },
   tab: {
+    alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
+    gap: 8,
     justifyContent: 'center',
     paddingVertical: 12,
-    gap: 8
   },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#000'
+  tabContainer: {
+    borderBottomColor: '#f3f4f6',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
   },
   tabText: {
+    color: '#9ca3af',
     fontSize: 14,
     fontWeight: '600',
-    color: '#9ca3af'
-  },
-  activeTabText: {
-    color: '#000'
   },
   tagBarContainer: {
-    borderBottomWidth: 1,
+    backgroundColor: '#fafafa',
     borderBottomColor: '#f3f4f6',
-    backgroundColor: '#fafafa'
-  },
-  tagScroll: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8
+    borderBottomWidth: 1,
   },
   tagChip: {
-    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#fff',
+    borderColor: '#e5e7eb',
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: 'row',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb'
   },
   tagChipActive: {
     backgroundColor: '#000',
-    borderColor: '#000'
+    borderColor: '#000',
   },
   tagChipText: {
+    color: '#4b5563',
     fontSize: 12,
     fontWeight: '600',
-    color: '#4b5563'
   },
   tagChipTextActive: {
-    color: '#fff'
+    color: '#fff',
   },
-  empty: {
-    flex: 1,
-    padding: 40,
+  tagScroll: {
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  topBar: {
     alignItems: 'center',
+    backgroundColor: '#fff',
+    borderBottomColor: '#f3f4f6',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+  },
+  topBarSide: {
+    alignItems: 'flex-end',
     justifyContent: 'center',
-    marginTop: 100
+    width: 40,
   },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827'
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginTop: 8
-  }
 });
