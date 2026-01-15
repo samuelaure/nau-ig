@@ -10,6 +10,12 @@ import { initDb } from '@/db';
 const MainLayout = ({ isCapture }: { isCapture?: boolean }) => {
   const { hasShareIntent, value, resetShareIntent } = useShareIntentContext();
 
+  useEffect(() => {
+    if (isCapture) {
+      console.log('[MainLayout] Running in Capture Mode. hasIntent:', hasShareIntent, 'value:', value);
+    }
+  }, [isCapture, hasShareIntent, value]);
+
   /**
    * If we are in CaptureActivity (isCapture is true), we MUST show either
    * the CaptureModal or a loading state. We never show the FeedScreen here.

@@ -102,7 +102,7 @@ function withAndroidShareTarget(config) {
       styles.push({
         $: {
           name: 'AppTheme.CaptureDialog',
-          parent: '@style/Theme.AppCompat.Light.Dialog',
+          parent: '@style/Theme.AppCompat.Light.NoActionBar',
         },
         item: [
           { $: { name: 'android:windowIsTranslucent' }, _: 'true' },
@@ -143,9 +143,10 @@ import expo.modules.ReactActivityDelegateWrapper
 
 class CaptureActivity : ReactActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Apply dialog theme before onCreate
+        // Apply dialog theme BEFORE onCreate
         setTheme(R.style.AppTheme_CaptureDialog)
-        super.onCreate(null) // Using null to match MainActivity.kt structure
+        super.onCreate(null)
+        android.util.Log.d("CaptureActivity", "onCreate with intent: \${intent?.action}")
     }
 
     /**
