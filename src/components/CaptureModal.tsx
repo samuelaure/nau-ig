@@ -114,7 +114,6 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
 
   const onTypeDate = (text: string) => {
     setStartDate(text);
-    // Simple validation to update picker date if valid
     const parsed = new Date(text);
     if (!isNaN(parsed.getTime())) {
       setPickerDate(parsed);
@@ -144,32 +143,25 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
   const handleSave = async () => {
     if (!shareValue) return;
 
-    console.log('Starting save process for:', shareValue);
     setIsSaving(true);
     try {
-      const postData = {
+      const postId = await savePost({
         instagramUrl: shareValue,
         title: title || 'Instagram Capture',
         content: note,
         tags: selectedTags,
         frequency: `${repeatInterval} ${repeatUnit}`,
         startDate: startDate,
-      };
-
-      console.log('Saving post with data:', postData);
-      const postId = await savePost(postData);
-      console.log('Post saved successfully, ID:', postId);
+      });
 
       const webhookUrl = await getSetting('make_webhook_url');
       if (webhookUrl) {
-        console.log('Triggering webhook:', webhookUrl);
         try {
           await sendToMake(webhookUrl, {
             action: 'capture',
             instagramUrl: shareValue,
             postId: postId,
           });
-          console.log('Webhook triggered successfully');
         } catch (webhookErr) {
           console.warn('Webhook failed:', webhookErr);
         }
@@ -260,7 +252,6 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
           </TouchableOpacity>
         </View>
 
-        {/* Selected Tags Preview */}
         {selectedTags.length > 0 && (
           <View style={styles.tagPreviewContainer}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -274,7 +265,6 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
         )}
       </Animated.View>
 
-      {/* Tag Picker Modal */}
       <Modal
         visible={showTagPicker}
         transparent
@@ -323,7 +313,6 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
         </TouchableOpacity>
       </Modal>
 
-      {/* Frequency Picker Modal */}
       <Modal
         visible={showFreqPicker}
         transparent
@@ -599,7 +588,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginBottom: 20,
-    zIndex: 10, // For dropdown overlap
+    zIndex: 10,
   },
   freqLabel: {
     color: '#5f6368',
