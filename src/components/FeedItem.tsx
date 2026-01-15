@@ -9,24 +9,19 @@ import {
   FlatList,
   ActivityIndicator,
   Animated,
-  TextInput
+  TextInput,
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
-import {
-  MoreHorizontal,
-  Repeat,
-  CheckCircle2,
-  DownloadCloud
-} from 'lucide-react-native';
+import { MoreHorizontal, Repeat, CheckCircle2, DownloadCloud } from 'lucide-react-native';
 import { TapGestureHandler, State } from 'react-native-gesture-handler';
-import { MediaCacheService } from '../services/MediaCacheService';
+import { MediaCacheService } from '@/services/MediaCacheService';
 import {
   Post,
   MediaItem,
   updatePostFrequency,
   markPostAsReviewed,
-  updatePostNote
-} from '../repositories/PostRepository';
+  updatePostNote,
+} from '@/repositories/PostRepository';
 
 const { width } = Dimensions.get('window');
 
@@ -57,14 +52,14 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
           Animated.timing(pulseAnim, {
             toValue: 1,
             duration: 1000,
-            useNativeDriver: true
+            useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
             toValue: 0.4,
             duration: 1000,
-            useNativeDriver: true
-          })
-        ])
+            useNativeDriver: true,
+          }),
+        ]),
       ).start();
     }
 
@@ -84,8 +79,8 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
         const cachedData = await Promise.all(
           data.map(async (item) => ({
             ...item,
-            localUri: await MediaCacheService.ensureMediaCached(item.url)
-          }))
+            localUri: await MediaCacheService.ensureMediaCached(item.url),
+          })),
         );
         setMedia(cachedData);
       } catch (e) {
@@ -107,7 +102,7 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
         console.error('Failed to auto-save note', e);
       }
     },
-    [post.id, post.content]
+    [post.id, post.content],
   );
 
   // Debounced save (1.5s of inactivity)
@@ -199,19 +194,11 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
         <View style={styles.mediaContainer}>
           {post.isProcessed === 0 ? (
             <Animated.View
-              style={[
-                styles.media,
-                styles.processingContainer,
-                { opacity: pulseAnim }
-              ]}
+              style={[styles.media, styles.processingContainer, { opacity: pulseAnim }]}
             >
               <DownloadCloud size={40} color="#9ca3af" />
               <Text style={styles.processingText}>Preparing media...</Text>
-              <ActivityIndicator
-                size="small"
-                color="#9ca3af"
-                style={{ marginTop: 12 }}
-              />
+              <ActivityIndicator size="small" color="#9ca3af" style={{ marginTop: 12 }} />
             </Animated.View>
           ) : loading ? (
             <View style={[styles.media, styles.loadingPlaceholder]}>
@@ -228,9 +215,7 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
             />
           ) : (
             <View style={[styles.media, styles.loadingPlaceholder]}>
-              <Text style={styles.emptyMediaText}>
-                Media error. Pull to refresh.
-              </Text>
+              <Text style={styles.emptyMediaText}>Media error. Pull to refresh.</Text>
             </View>
           )}
         </View>
@@ -261,7 +246,7 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
           style={[
             styles.repeatCircle,
             isHistory && styles.historyCircle,
-            post.isProcessed === 0 && styles.disabledCircle
+            post.isProcessed === 0 && styles.disabledCircle,
           ]}
           onPress={handleReviewed}
           disabled={isUpdating || isHistory || post.isProcessed === 0}
@@ -304,16 +289,13 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
                 {post.content}
               </Text>
             ) : (
-              <Text style={styles.emptyNotePlaceholder}>
-                Tap to add your thoughts...
-              </Text>
+              <Text style={styles.emptyNotePlaceholder}>Tap to add your thoughts...</Text>
             )}
           </TouchableOpacity>
         )}
         <View style={styles.footerInfo}>
           <Text style={styles.date}>
-            {isHistory ? 'Next review in' : 'Review due in'} {post.sm2_interval}{' '}
-            days
+            {isHistory ? 'Next review in' : 'Review due in'} {post.sm2_interval} days
           </Text>
         </View>
       </View>
@@ -322,168 +304,168 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#fff',
-    marginBottom: 12
-  },
-  header: {
-    flexDirection: 'row',
+  actions: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12
-  },
-  userSection: {
     flexDirection: 'row',
-    alignItems: 'center'
+    justifyContent: 'space-between',
+    padding: 12,
   },
   avatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
     backgroundColor: '#f0f0f0',
-    marginRight: 10
+    borderRadius: 16,
+    height: 32,
+    marginRight: 10,
+    width: 32,
   },
-  username: {
-    fontWeight: '700',
-    fontSize: 14
+  container: {
+    backgroundColor: '#fff',
+    marginBottom: 12,
   },
-  tagDisplayList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap'
+  content: {
+    paddingBottom: 16,
+    paddingHorizontal: 12,
   },
-  headerTagText: {
-    fontSize: 10,
-    color: '#3b82f6',
-    fontWeight: '600'
-  },
-  mediaContainer: {
-    width: width,
-    height: width,
-    backgroundColor: '#fafafa'
-  },
-  media: {
-    width: width,
-    height: width,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  processingContainer: {
-    backgroundColor: '#f9fafb'
-  },
-  processingText: {
-    marginTop: 12,
+  date: {
     color: '#9ca3af',
-    fontSize: 14,
-    fontWeight: '500'
+    fontSize: 11,
+    fontStyle: 'italic',
   },
-  loadingPlaceholder: {
-    backgroundColor: '#eee'
+  disabledCircle: {
+    backgroundColor: '#e5e7eb',
+    elevation: 0,
+    shadowOpacity: 0,
   },
   emptyMediaText: {
     color: '#9ca3af',
-    fontSize: 12
+    fontSize: 12,
   },
-  actions: {
-    flexDirection: 'row',
+  emptyNotePlaceholder: {
+    color: '#9ca3af',
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  footerInfo: {
     alignItems: 'center',
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 12
-  },
-  frequencyControlGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 24,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: '#e5e7eb'
+    marginTop: 8,
   },
   freqActionBtn: {
+    borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 6,
-    borderRadius: 20
   },
   freqBtnText: {
+    color: '#4b5563',
     fontSize: 12,
     fontWeight: '700',
-    color: '#4b5563'
   },
   frequencyBadge: {
+    alignItems: 'center',
     backgroundColor: '#fff',
+    borderRadius: 16,
+    elevation: 2,
+    minWidth: 40,
     paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 16,
-    minWidth: 40,
-    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 1,
-    elevation: 2
+  },
+  frequencyControlGroup: {
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    borderColor: '#e5e7eb',
+    borderRadius: 24,
+    borderWidth: 1,
+    flexDirection: 'row',
+    padding: 4,
   },
   frequencyValue: {
+    color: '#000',
     fontSize: 13,
     fontWeight: '800',
-    color: '#000'
+  },
+  header: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 12,
+  },
+  headerTagText: {
+    color: '#3b82f6',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  historyCircle: {
+    backgroundColor: '#10b981',
+    shadowColor: '#10b981',
+  },
+  loadingPlaceholder: {
+    backgroundColor: '#eee',
+  },
+  media: {
+    alignItems: 'center',
+    height: width,
+    justifyContent: 'center',
+    width: width,
+  },
+  mediaContainer: {
+    backgroundColor: '#fafafa',
+    height: width,
+    width: width,
+  },
+  noteInput: {
+    minHeight: 40,
+    paddingVertical: 8,
+    textAlignVertical: 'top',
+  },
+  notePreview: {
+    minHeight: 40,
+    paddingVertical: 8,
+  },
+  notes: {
+    color: '#4b5563',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  notesLabel: {
+    color: '#1a1a1a',
+    fontWeight: '700',
+  },
+  processingContainer: {
+    backgroundColor: '#f9fafb',
+  },
+  processingText: {
+    color: '#9ca3af',
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 12,
   },
   repeatCircle: {
-    backgroundColor: '#3b82f6',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
     alignItems: 'center',
+    backgroundColor: '#3b82f6',
+    borderRadius: 22,
+    elevation: 4,
+    height: 44,
     justifyContent: 'center',
     shadowColor: '#3b82f6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 4
+    width: 44,
   },
-  historyCircle: {
-    backgroundColor: '#10b981',
-    shadowColor: '#10b981'
-  },
-  disabledCircle: {
-    backgroundColor: '#e5e7eb',
-    shadowOpacity: 0,
-    elevation: 0
-  },
-  content: {
-    paddingHorizontal: 12,
-    paddingBottom: 16
-  },
-  notePreview: {
-    paddingVertical: 8,
-    minHeight: 40
-  },
-  noteInput: {
-    paddingVertical: 8,
-    minHeight: 40,
-    textAlignVertical: 'top'
-  },
-  notesLabel: {
-    fontWeight: '700',
-    color: '#1a1a1a'
-  },
-  notes: {
-    fontSize: 14,
-    color: '#4b5563',
-    lineHeight: 20
-  },
-  emptyNotePlaceholder: {
-    fontSize: 14,
-    color: '#9ca3af',
-    fontStyle: 'italic'
-  },
-  footerInfo: {
+  tagDisplayList: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8
+    flexWrap: 'wrap',
   },
-  date: {
-    fontSize: 11,
-    color: '#9ca3af',
-    fontStyle: 'italic'
-  }
+  userSection: {
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  username: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
 });

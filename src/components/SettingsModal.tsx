@@ -8,11 +8,11 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert
+  Alert,
 } from 'react-native';
 import { X, Globe, Database, Trash2 } from 'lucide-react-native';
-import { getSetting, setSetting } from '../storage/settings';
-import { MediaCacheService } from '../services/MediaCacheService';
+import { getSetting, setSetting } from '@/repositories/SettingsRepository';
+import { MediaCacheService } from '@/services/MediaCacheService';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -50,9 +50,9 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
             } finally {
               setIsClearing(false);
             }
-          }
-        }
-      ]
+          },
+        },
+      ],
     );
   };
 
@@ -98,15 +98,11 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
                 <Text style={styles.dangerActionText}>
                   {isClearing ? 'Clearing...' : 'Clear Media Cache'}
                 </Text>
-                <Trash2
-                  size={16}
-                  color="#ef4444"
-                  style={{ marginLeft: 'auto' }}
-                />
+                <Trash2 size={16} color="#ef4444" style={{ marginLeft: 'auto' }} />
               </TouchableOpacity>
               <Text style={styles.helpText}>
-                Clearing the cache frees up local storage. Media is
-                automatically re-downloaded when needed.
+                Clearing the cache frees up local storage. Media is automatically re-downloaded when
+                needed.
               </Text>
 
               <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
@@ -121,95 +117,95 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: 20
-  },
-  container: {
-    flex: 1,
-    justifyContent: 'center'
-  },
   card: {
     backgroundColor: '#fff',
     borderRadius: 24,
+    elevation: 5,
     padding: 24,
     shadowColor: '#000',
     shadowOpacity: 0.1,
     shadowRadius: 10,
-    elevation: 5
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '800'
+  container: {
+    flex: 1,
+    justifyContent: 'center',
   },
   content: {
-    gap: 12
+    gap: 12,
   },
-  label: {
+  dangerActionBtn: {
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    borderColor: '#fee2e2',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  dangerActionText: {
+    color: '#ef4444',
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151'
   },
-  sectionDivider: {
-    height: 1,
-    backgroundColor: '#f3f4f6',
-    marginVertical: 12
-  },
-  inputContainer: {
-    flexDirection: 'row',
+  header: {
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    paddingHorizontal: 12
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
   },
-  inputIcon: {
-    marginRight: 8
+  helpText: {
+    color: '#6b7280',
+    fontSize: 12,
+    lineHeight: 18,
   },
   input: {
     flex: 1,
+    fontSize: 14,
     paddingVertical: 12,
-    fontSize: 14
   },
-  dangerActionBtn: {
-    flexDirection: 'row',
+  inputContainer: {
     alignItems: 'center',
-    backgroundColor: '#fef2f2',
-    borderWidth: 1,
-    borderColor: '#fee2e2',
+    backgroundColor: '#f9fafb',
+    borderColor: '#e5e7eb',
     borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
     paddingHorizontal: 12,
-    paddingVertical: 12
   },
-  dangerActionText: {
+  inputIcon: {
+    marginRight: 8,
+  },
+  label: {
+    color: '#374151',
     fontSize: 14,
     fontWeight: '600',
-    color: '#ef4444'
   },
-  helpText: {
-    fontSize: 12,
-    color: '#6b7280',
-    lineHeight: 18
+  overlay: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
   },
   saveBtn: {
-    backgroundColor: '#000',
-    padding: 16,
-    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 12
+    backgroundColor: '#000',
+    borderRadius: 12,
+    marginTop: 12,
+    padding: 16,
   },
   saveBtnText: {
     color: '#fff',
+    fontSize: 16,
     fontWeight: '700',
-    fontSize: 16
-  }
+  },
+  sectionDivider: {
+    backgroundColor: '#f3f4f6',
+    height: 1,
+    marginVertical: 12,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
 });
