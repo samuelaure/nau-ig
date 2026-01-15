@@ -145,7 +145,7 @@ class CaptureActivity : ReactActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // Apply dialog theme before onCreate
         setTheme(R.style.AppTheme_CaptureDialog)
-        super.onCreate(savedInstanceState)
+        super.onCreate(null) // Using null to match MainActivity.kt structure
     }
 
     /**
@@ -167,7 +167,13 @@ class CaptureActivity : ReactActivity() {
                 this,
                 mainComponentName,
                 fabricEnabled
-            ) {}
+            ) {
+                override fun getLaunchOptions(): Bundle? {
+                    val initialProps = Bundle()
+                    initialProps.putBoolean("isCapture", true)
+                    return initialProps
+                }
+            }
         )
     }
 }

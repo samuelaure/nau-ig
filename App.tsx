@@ -7,23 +7,33 @@ import { FeedScreen } from '@/screens/FeedScreen';
 import { CaptureModal } from '@/components/CaptureModal';
 import { initDb } from '@/db';
 
-const MainLayout = () => {
+const MainLayout = ({ isCapture }: { isCapture?: boolean }) => {
   const { hasShareIntent, value, resetShareIntent } = useShareIntentContext();
 
   /**
-   * If there is an active share intent, we render ONLY the CaptureModal.
-   * This is key for the Dialog-themed Share activity to look professional
-   * and avoid showing the main app feed in the background.
+   * If we are in CaptureActivity (isCapture is true), we MUST show either
+   * the CaptureModal or a loading state. We never show the FeedScreen here.
    */
-  if (hasShareIntent) {
+  if (isCapture) {
+    if (hasShareIntent) {
+      return (
+        <View style={styles.shareOverlay}>
+          <StatusBar style="dark" />
+          <CaptureModal shareValue={value} onClose={resetShareIntent} />
+        </View>
+      );
+    }
+
+    // While waiting for the intent to be processed by the library
     return (
       <View style={styles.shareOverlay}>
         <StatusBar style="dark" />
-        <CaptureModal shareValue={value} onClose={resetShareIntent} />
+        {/* Transparent loading state or a subtle spinner could go here if needed */}
       </View>
     );
   }
 
+  // Normal app flow
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
@@ -32,7 +42,7 @@ const MainLayout = () => {
   );
 };
 
-export default function App() {
+export default function App(props: any) {
   useEffect(() => {
     initDb().catch((err) => {
       console.error('CRITICAL: DB Init Error:', err);
@@ -42,7 +52,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ShareIntentProvider>
-        <MainLayout />
+        <MainLayout isCapture={props?.isCapture} />
       </ShareIntentProvider>
     </SafeAreaProvider>
   );
