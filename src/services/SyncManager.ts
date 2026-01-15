@@ -9,39 +9,58 @@ import { sendToMake } from './SyncService';
 
 /**
  * SyncManager handles the background synchronization of captures.
- * It implements a "one-at-a-time" execution lock and handle retry logic.
+ * It implements a "one-at-a-time" execution lock and automatically stops
+ * when there is no work to do to save resources.
  */
 class SyncManager {
     private isSyncing = false;
     private intervalId: NodeJS.Timeout | null = null;
-    private lastSyncTime = 0;
     private subscribers: (() => void)[] = [];
+    private pollingInterval = 15000;
 
     /**
-     * Starts the sync loop.
+     * Main entry point to wake up the sync service.
+     * If already running, it does nothing. If stopped, it performs a sync
+     * and starts the timer if there's more work.
      */
-    start(pollingIntervalMs = 15000) {
-        if (this.intervalId) return;
+    async triggerSync(pollingIntervalMs = 15000) {
+        this.pollingInterval = pollingIntervalMs;
+        console.log('[SyncManager] Trigger requested.');
 
-        // Initial sync
-        this.sync();
+        if (this.isSyncing) return;
 
-        this.intervalId = setInterval(() => {
-            this.sync();
-        }, pollingIntervalMs);
+        // Perform an immediate sync
+        const hasMoreWork = await this.performSync();
 
-        console.log('[SyncManager] Service started.');
+        // If there is more work to do, ensure the timer is running
+        if (hasMoreWork && !this.intervalId) {
+            console.log('[SyncManager] More work found. Starting timer.');
+            this.intervalId = setInterval(() => this.backgroundTick(), this.pollingInterval);
+        }
     }
 
     /**
-     * Stops the sync loop.
+     * Internal tick for the interval timer
+     */
+    private async backgroundTick() {
+        if (this.isSyncing) return;
+
+        const hasMoreWork = await this.performSync();
+
+        if (!hasMoreWork && this.intervalId) {
+            console.log('[SyncManager] Work complete. Shutting down timer.');
+            this.stop();
+        }
+    }
+
+    /**
+     * Stops the sync timer.
      */
     stop() {
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = null;
         }
-        console.log('[SyncManager] Service stopped.');
     }
 
     /**
@@ -59,26 +78,26 @@ class SyncManager {
     }
 
     /**
-     * Performs a single sync operation.
+     * Performs the actual sync logic.
+     * @returns boolean - true if there are still pending items to sync
      */
-    async sync() {
-        if (this.isSyncing) return;
+    async performSync(): Promise<boolean> {
+        if (this.isSyncing) return false;
 
         try {
             this.isSyncing = true;
             const webhookUrl = await getSetting('make_webhook_url');
 
             if (!webhookUrl) {
-                console.warn('[SyncManager] Webhook URL missing. Skipping sync.');
-                return;
+                console.warn('[SyncManager] Webhook URL missing. Skipping.');
+                return false;
             }
 
             const MAX_ATTEMPTS = 10;
             const pending = await getPendingPosts(MAX_ATTEMPTS);
 
             if (pending.length === 0) {
-                // Stop the noise if there's nothing to do
-                return;
+                return false;
             }
 
             console.log(`[SyncManager] Syncing ${pending.length} items...`);
@@ -93,49 +112,39 @@ class SyncManager {
 
                 for (const p of pending) {
                     const result = response.results[p.id];
-
                     if (result?.status === 'success' && result.mediaData) {
                         await updatePostMedia(p.id, result.mediaData);
                         hasChanges = true;
-                        console.log(`[SyncManager] Item ${p.id} processed successfully.`);
                     } else {
-                        // Either specifically marked pending by backend or missing from results
                         await this.handleFailure(p, MAX_ATTEMPTS);
                     }
                 }
-
                 if (hasChanges) this.notify();
             } else {
-                // Whole batch failed (e.g. webhook error response)
+                // Batch request failed or returned error status
                 for (const p of pending) {
                     await this.handleFailure(p, MAX_ATTEMPTS);
                 }
             }
+
+            // Check again if there's more work after this batch
+            const remaining = await getPendingPosts(MAX_ATTEMPTS);
+            return remaining.length > 0;
+
         } catch (error) {
-            console.error('[SyncManager] Critical error during sync:', error);
-            // In case of network errors (fetch fail), we still increment attempts 
-            // to avoid infinite loops on invalid URLs or permanent network issues
-            try {
-                const pending = await getPendingPosts(10);
-                for (const p of pending) {
-                    await this.handleFailure(p, 10);
-                }
-            } catch (innerErr) {
-                // DB might be locked or closed
-            }
+            console.error('[SyncManager] Sync error:', error);
+            return true; // Assume more work to retry later on error
         } finally {
             this.isSyncing = false;
-            this.lastSyncTime = Date.now();
         }
     }
 
     private async handleFailure(post: any, maxAttempts: number) {
         await incrementSyncAttempts(post.id);
-        // Note: post.sync_attempts is what it was BEFORE this increment
         if (post.sync_attempts + 1 >= maxAttempts) {
-            console.log(`[SyncManager] Item ${post.id} hit retry limit. Moving to STANDBY.`);
+            console.log(`[SyncManager] Item ${post.id} hit retry limit -> STANDBY.`);
             await updateSyncStatus(post.id, 'standby');
-            this.notify(); // Notify so UI can show standby state or refresh
+            this.notify();
         }
     }
 }

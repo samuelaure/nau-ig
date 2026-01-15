@@ -47,10 +47,10 @@ export const FeedScreen = () => {
   useEffect(() => {
     loadFeed();
 
-    // Start the centralized sync service (industry-standard background manager)
-    syncManager.start(15000);
+    // Wake up the sync service (it will shut itself down if nothing to do)
+    syncManager.triggerSync(15000);
 
-    // Subscribe to sync events to automatically refresh the feed when data arrives
+    // Subscribe to sync events to automatically refresh the feed
     const unsubscribe = syncManager.subscribe(() => {
       loadFeed();
     });
@@ -64,7 +64,7 @@ export const FeedScreen = () => {
   const onRefresh = async () => {
     setRefreshing(true);
     // Explicitly trigger a sync on pull-to-refresh
-    await syncManager.sync();
+    await syncManager.performSync();
     await loadFeed();
     setRefreshing(false);
   };

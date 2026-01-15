@@ -77,8 +77,9 @@ export const initDb = async (): Promise<void> => {
 
   // Migration for existing databases
   try {
-    await runSql('ALTER TABLE posts ADD COLUMN sync_attempts INTEGER DEFAULT 0');
-    await runSql("ALTER TABLE posts ADD COLUMN sync_status TEXT DEFAULT 'pending'");
+    // Only attempt if not existing - catches errors silently to avoid dev red screen
+    await runSql('ALTER TABLE posts ADD COLUMN sync_attempts INTEGER DEFAULT 0').catch(() => { });
+    await runSql("ALTER TABLE posts ADD COLUMN sync_status TEXT DEFAULT 'pending'").catch(() => { });
   } catch (e) {
     // Columns likely already exist
   }

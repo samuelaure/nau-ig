@@ -31,6 +31,7 @@ import {
 import { savePost, getAllTags } from '@/repositories/PostRepository';
 import { getSetting } from '@/repositories/SettingsRepository';
 import { sendToMake } from '@/services/SyncService';
+import { syncManager } from '@/services/SyncManager';
 import { COLORS } from '@/constants';
 
 interface CaptureModalProps {
@@ -191,7 +192,11 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
           action: 'capture',
           instagramUrl: cleanUrl.current,
           postId: postId,
-        }).then(() => console.log('[CaptureModal] Webhook async success'))
+        }).then(() => {
+          console.log('[CaptureModal] Webhook async success');
+          // Wake up the background sync manager to start downloading the new capture
+          syncManager.triggerSync();
+        })
           .catch(err => console.warn('[CaptureModal] Webhook async failed:', err));
       }
 

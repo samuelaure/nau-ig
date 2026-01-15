@@ -14,6 +14,7 @@ import { X, Globe, Database, Trash2, RefreshCcw } from 'lucide-react-native';
 import { getSetting, setSetting } from '@/repositories/SettingsRepository';
 import { getStandbyPosts, resetSyncForManualRetry, updatePostMedia } from '@/repositories/PostRepository';
 import { sendToMake } from '@/services/SyncService';
+import { syncManager } from '@/services/SyncManager';
 import { MediaCacheService } from '@/services/MediaCacheService';
 
 interface SettingsModalProps {
@@ -107,6 +108,8 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
 
         if (toRestart.length > 0) {
           await resetSyncForManualRetry(toRestart);
+          // Wake up the background sync manager to process the restarted tasks
+          syncManager.triggerSync();
         }
 
         Alert.alert(
