@@ -17,12 +17,15 @@ function withAndroidShareTarget(config) {
   config = withAndroidManifest(config, (config) => {
     const manifest = config.modResults.manifest;
     const application = manifest.application[0];
-    const mainActivity = application.activity.find((a) => a.$['android:name'] === '.MainActivity');
+    // Find MainActivity - checking both relative and fully qualified names
+    const mainActivity = application.activity.find(
+      (a) => a.$['android:name'] === '.MainActivity' || a.$['android:name']?.endsWith('.MainActivity'),
+    );
 
     if (mainActivity) {
       mainActivity.$['android:launchMode'] = 'singleTask';
 
-      // Remove general SEND from Main Activity to prevent deep-linking issues
+      // Aggressively remove SEND intent filters from MainActivity to avoid double icons
       if (mainActivity['intent-filter']) {
         mainActivity['intent-filter'] = mainActivity['intent-filter'].filter((filter) => {
           const actionArr = Array.isArray(filter.action) ? filter.action : [filter.action];
