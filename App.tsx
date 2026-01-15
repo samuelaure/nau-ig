@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ShareIntentProvider, useShareIntentContext } from '@/context/ShareIntentContext';
 import { FeedScreen } from '@/screens/FeedScreen';
 import { CaptureModal } from '@/components/CaptureModal';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { initDb } from '@/db';
 
 const MainLayout = () => {
@@ -27,9 +28,11 @@ export default function App() {
   }, []);
 
   return (
-    <ShareIntentProvider>
-      <MainLayout />
-    </ShareIntentProvider>
+    <SafeAreaProvider>
+      <ShareIntentProvider>
+        <MainLayout />
+      </ShareIntentProvider>
+    </SafeAreaProvider>
   );
 }
 

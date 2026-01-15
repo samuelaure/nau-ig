@@ -25,8 +25,9 @@ function withAndroidShareTarget(config) {
       // Remove general SEND from Main Activity to prevent deep-linking issues
       if (mainActivity['intent-filter']) {
         mainActivity['intent-filter'] = mainActivity['intent-filter'].filter((filter) => {
-          const hasSendAction = filter.action?.some(
-            (action) => action.$['android:name'] === 'android.intent.action.SEND',
+          const actionArr = Array.isArray(filter.action) ? filter.action : [filter.action];
+          const hasSendAction = actionArr.some(
+            (action) => action?.$?.['android:name'] === 'android.intent.action.SEND',
           );
           return !hasSendAction;
         });
@@ -76,7 +77,7 @@ function withAndroidShareTarget(config) {
       styles.push({
         $: {
           name: 'AppTheme.CaptureDialog',
-          parent: 'Theme.AppCompat.Light.Dialog.NoActionBar',
+          parent: '@style/Theme.AppCompat.Light.Dialog',
         },
         item: [
           { $: { name: 'android:windowIsTranslucent' }, _: 'true' },
