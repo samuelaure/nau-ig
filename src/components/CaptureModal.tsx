@@ -12,9 +12,18 @@ import {
   Platform,
   BackHandler,
   Animated,
-  Dimensions,
+  Modal,
 } from 'react-native';
-import { Save, X, Hash, Clock, Plus, Link as LinkIcon, Check } from 'lucide-react-native';
+import {
+  X,
+  Plus,
+  Link as LinkIcon,
+  Check,
+  Tag as TagIcon,
+  RotateCw,
+  Square,
+  CheckSquare
+} from 'lucide-react-native';
 import { savePost, getAllTags } from '@/repositories/PostRepository';
 import { getSetting } from '@/repositories/SettingsRepository';
 import { sendToMake } from '@/services/SyncService';
@@ -25,22 +34,27 @@ interface CaptureModalProps {
   onClose: () => void;
 }
 
-const FREQUENCIES = [
-  { id: 'daily', label: 'Daily' },
-  { id: 'weekly', label: 'Weekly' },
-  { id: 'monthly', label: 'Monthly' },
-];
+const UNITS = ['Days', 'Weeks', 'Months', 'Years'];
 
 export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose }) => {
+  const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
-  const [frequency, setFrequency] = useState('daily');
   const [isSaving, setIsSaving] = useState(false);
   const [existingTags, setExistingTags] = useState<string[]>([]);
 
+  // Frequency States
+  const [repeatInterval, setRepeatInterval] = useState('1');
+  const [repeatUnit, setRepeatUnit] = useState('Days');
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Modal Visibility
+  const [showTagPicker, setShowTagPicker] = useState(false);
+  const [showFreqPicker, setShowFreqPicker] = useState(false);
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
     loadExistingTags();
@@ -73,8 +87,13 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
 
   const addNewTag = () => {
     const tag = newTag.trim().toLowerCase();
-    if (tag && !selectedTags.includes(tag)) {
-      setSelectedTags([...selectedTags, tag]);
+    if (tag) {
+      if (!existingTags.includes(tag)) {
+        setExistingTags([tag, ...existingTags]);
+      }
+      if (!selectedTags.includes(tag)) {
+        setSelectedTags([...selectedTags, tag]);
+      }
       setNewTag('');
     }
   };
@@ -87,7 +106,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
-        toValue: 20,
+        toValue: 30,
         duration: 250,
         useNativeDriver: true,
       }),
@@ -106,10 +125,11 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
     try {
       const postId = await savePost({
         instagramUrl: shareValue,
-        title: 'Instagram Capture',
+        title: title || 'Instagram Capture',
         content: note,
         tags: selectedTags,
-        frequency: frequency,
+        frequency: `${repeatInterval} ${repeatUnit}`,
+        startDate: startDate,
       });
 
       const webhookUrl = await getSetting('make_webhook_url');
@@ -152,115 +172,53 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
           },
         ]}
       >
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text style={styles.title}>Quick Capture</Text>
-            <View style={styles.linkContainer}>
-              <LinkIcon size={12} color="#9ca3af" />
-              <Text style={styles.subtitle} numberOfLines={1}>
-                {shareValue?.replace('https://', '').replace('www.', '') || 'No URL'}
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            onPress={handleClose}
-            style={styles.closeButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <X color="#9ca3af" size={20} />
-          </TouchableOpacity>
+        <View style={styles.urlHeader}>
+          <LinkIcon size={10} color="#9ca3af" />
+          <Text style={styles.urlText} numberOfLines={1}>
+            {shareValue?.replace('https://', '').replace('www.', '') || 'No URL'}
+          </Text>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <View style={styles.inputSection}>
-            <TextInput
-              style={styles.noteInput}
-              placeholder="Add your thoughts or notes..."
-              placeholderTextColor="#9ca3af"
-              multiline
-              value={note}
-              onChangeText={setNote}
-              autoFocus
-            />
-          </View>
+        <TextInput
+          style={styles.titleInput}
+          placeholder="Title"
+          placeholderTextColor="#9ca3af"
+          value={title}
+          onChangeText={setTitle}
+        />
 
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Hash size={14} color={COLORS.textSecondary} />
-              <Text style={styles.sectionTitle}>Contextual Tags</Text>
-            </View>
-            <View style={styles.tagInputContainer}>
-              <TextInput
-                style={styles.tagInput}
-                placeholder="Type tag name..."
-                placeholderTextColor="#9ca3af"
-                value={newTag}
-                onChangeText={setNewTag}
-                onSubmitEditing={addNewTag}
-              />
-              <TouchableOpacity onPress={addNewTag} style={styles.addTagIcon}>
-                <Plus size={18} color={COLORS.primary} />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.tagCloud}>
+        <TextInput
+          style={styles.noteInput}
+          placeholder="Take a note..."
+          placeholderTextColor="#9ca3af"
+          multiline
+          value={note}
+          onChangeText={setNote}
+          autoFocus
+        />
+
+        <View style={styles.bottomRow}>
+          <View style={styles.actionsLeft}>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => setShowTagPicker(true)}
+            >
+              <TagIcon size={20} color="#5f6368" />
               {selectedTags.length > 0 && (
-                <View style={styles.tagGroup}>
-                  {selectedTags.map((tag) => (
-                    <TouchableOpacity
-                      key={tag}
-                      onPress={() => toggleTag(tag)}
-                      style={[styles.tagChip, styles.tagChipActive]}
-                    >
-                      <Text style={styles.tagChipTextActive}>{tag}</Text>
-                      <X size={10} color="#fff" style={{ marginLeft: 4 }} />
-                    </TouchableOpacity>
-                  ))}
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{selectedTags.length}</Text>
                 </View>
               )}
-              {existingTags.filter((t) => !selectedTags.includes(t)).length > 0 && (
-                <View style={styles.tagGroup}>
-                  {existingTags
-                    .filter((t) => !selectedTags.includes(t))
-                    .map((tag) => (
-                      <TouchableOpacity
-                        key={tag}
-                        onPress={() => toggleTag(tag)}
-                        style={styles.tagChip}
-                      >
-                        <Text style={styles.tagChipText}># {tag}</Text>
-                      </TouchableOpacity>
-                    ))}
-                </View>
-              )}
-            </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => setShowFreqPicker(true)}
+            >
+              <RotateCw size={20} color="#5f6368" />
+            </TouchableOpacity>
           </View>
 
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Clock size={14} color={COLORS.textSecondary} />
-              <Text style={styles.sectionTitle}>Spaced Repetition</Text>
-            </View>
-            <View style={styles.freqContainer}>
-              {FREQUENCIES.map((f) => {
-                const isActive = frequency === f.id;
-                return (
-                  <TouchableOpacity
-                    key={f.id}
-                    onPress={() => setFrequency(f.id)}
-                    style={[styles.freqButton, isActive && styles.freqButtonActive]}
-                  >
-                    {isActive && <Check size={12} color="#fff" style={{ marginRight: 4 }} />}
-                    <Text style={[styles.freqText, isActive && styles.freqTextActive]}>
-                      {f.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </ScrollView>
-
-        <View style={styles.footer}>
           <TouchableOpacity
             style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
             onPress={handleSave}
@@ -269,14 +227,123 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
             {isSaving ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <>
-                <Save color="#fff" size={18} />
-                <Text style={styles.saveText}>Capture to Loop</Text>
-              </>
+              <Text style={styles.saveText}>Save</Text>
             )}
           </TouchableOpacity>
         </View>
+
+        {/* Selected Tags Preview */}
+        {selectedTags.length > 0 && (
+          <View style={styles.tagPreviewContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {selectedTags.map(tag => (
+                <View key={tag} style={styles.previewTag}>
+                  <Text style={styles.previewTagText}>{tag}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
       </Animated.View>
+
+      {/* Tag Picker Modal */}
+      <Modal
+        visible={showTagPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTagPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowTagPicker(false)}
+        >
+          <View style={styles.popupContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.popupHeader}>
+              <TextInput
+                style={styles.popupInput}
+                placeholder="New label..."
+                value={newTag}
+                onChangeText={setNewTag}
+              />
+              <TouchableOpacity onPress={addNewTag} style={styles.addTagBtn}>
+                <Plus size={20} color={COLORS.primary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.popupList}>
+              {existingTags.map(tag => {
+                const isSelected = selectedTags.includes(tag);
+                return (
+                  <TouchableOpacity
+                    key={tag}
+                    style={styles.popupItem}
+                    onPress={() => toggleTag(tag)}
+                  >
+                    {isSelected ? <CheckSquare size={18} color={COLORS.primary} /> : <Square size={18} color="#5f6368" />}
+                    <Text style={[styles.popupItemText, isSelected && styles.popupItemTextActive]}>{tag}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Frequency Picker Modal */}
+      <Modal
+        visible={showFreqPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFreqPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowFreqPicker(false)}
+        >
+          <View style={styles.popupContent} onStartShouldSetResponder={() => true}>
+            <Text style={styles.popupTitle}>Repetition</Text>
+
+            <View style={styles.freqRow}>
+              <Text style={styles.freqLabel}>Every</Text>
+              <TextInput
+                style={styles.freqInput}
+                keyboardType="numeric"
+                value={repeatInterval}
+                onChangeText={setRepeatInterval}
+              />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.unitScroll}>
+                {UNITS.map(u => (
+                  <TouchableOpacity
+                    key={u}
+                    onPress={() => setRepeatUnit(u)}
+                    style={[styles.unitBtn, repeatUnit === u && styles.unitBtnActive]}
+                  >
+                    <Text style={[styles.unitText, repeatUnit === u && styles.unitTextActive]}>{u}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.dateRow}>
+              <Text style={styles.freqLabel}>Starts</Text>
+              <TextInput
+                style={styles.dateInput}
+                value={startDate}
+                onChangeText={setStartDate}
+                placeholder="YYYY-MM-DD"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.doneBtn}
+              onPress={() => setShowFreqPicker(false)}
+            >
+              <Text style={styles.doneBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -296,157 +363,76 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 24,
     elevation: 24,
-    maxHeight: '80%',
     maxWidth: 400,
-    overflow: 'hidden',
-    padding: 24,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.2,
     shadowRadius: 20,
     width: '100%',
   },
-  header: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  headerText: {
-    flex: 1,
-  },
-  title: {
-    color: '#111827',
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  linkContainer: {
+  urlHeader: {
     alignItems: 'center',
     flexDirection: 'row',
-    marginTop: 4,
+    marginBottom: 12,
+    opacity: 0.6,
   },
-  subtitle: {
-    color: '#6b7280',
-    fontSize: 12,
+  urlText: {
+    color: '#5f6368',
+    fontSize: 11,
     marginLeft: 4,
-    maxWidth: '90%',
   },
-  closeButton: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 20,
-    padding: 6,
-  },
-  inputSection: {
-    marginBottom: 16,
+  titleInput: {
+    color: '#202124',
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 8,
+    padding: 0,
   },
   noteInput: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 16,
-    color: '#111827',
-    fontSize: 15,
-    minHeight: 80,
-    padding: 16,
+    color: '#3c4043',
+    fontSize: 16,
+    lineHeight: 24,
+    minHeight: 100,
+    padding: 0,
     textAlignVertical: 'top',
   },
-  section: {
-    marginBottom: 16,
-  },
-  sectionHeader: {
+  bottomRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 6,
-    marginBottom: 8,
+    justifyContent: 'space-between',
+    marginTop: 16,
   },
-  sectionTitle: {
-    color: COLORS.textSecondary,
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
+  actionsLeft: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  tagInputContainer: {
+  iconButton: {
+    padding: 8,
+    position: 'relative',
+  },
+  badge: {
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    flexDirection: 'row',
-    marginBottom: 8,
-    paddingHorizontal: 12,
-  },
-  tagInput: {
-    color: '#111827',
-    flex: 1,
-    fontSize: 14,
-    paddingVertical: 10,
-  },
-  addTagIcon: {
-    paddingLeft: 8,
-  },
-  tagCloud: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  tagGroup: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 4,
-  },
-  tagChip: {
-    alignItems: 'center',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    flexDirection: 'row',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  tagChipActive: {
     backgroundColor: COLORS.primary,
-  },
-  tagChipText: {
-    color: '#4b5563',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  tagChipTextActive: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  freqContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  freqButton: {
-    alignItems: 'center',
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    flex: 1,
-    flexDirection: 'row',
+    borderRadius: 8,
+    height: 16,
     justifyContent: 'center',
-    paddingVertical: 10,
+    minWidth: 16,
+    paddingHorizontal: 4,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
-  freqButtonActive: {
-    backgroundColor: '#111827',
-  },
-  freqText: {
-    color: '#4b5563',
-    fontSize: 12,
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
     fontWeight: '700',
   },
-  freqTextActive: {
-    color: '#fff',
-  },
-  footer: {
-    marginTop: 8,
-  },
   saveButton: {
-    alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    borderRadius: 16,
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'center',
-    padding: 16,
+    backgroundColor: '#a34d20', // Matches the brown-ish tone in Google Keep screenshot
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
   },
   saveButtonDisabled: {
     opacity: 0.7,
@@ -454,6 +440,141 @@ const styles = StyleSheet.create({
   saveText: {
     color: '#fff',
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
+  },
+  tagPreviewContainer: {
+    flexDirection: 'row',
+    marginTop: 12,
+  },
+  previewTag: {
+    backgroundColor: '#f1f3f4',
+    borderRadius: 12,
+    marginRight: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  previewTagText: {
+    color: '#5f6368',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  // Popup Styles
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  popupContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    maxHeight: '60%',
+    padding: 16,
+    width: '80%',
+  },
+  popupHeader: {
+    alignItems: 'center',
+    borderBottomColor: '#f1f3f4',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    marginBottom: 12,
+    paddingBottom: 8,
+  },
+  popupInput: {
+    flex: 1,
+    fontSize: 16,
+  },
+  addTagBtn: {
+    padding: 8,
+  },
+  popupList: {
+    maxHeight: 200,
+  },
+  popupItem: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    paddingVertical: 12,
+  },
+  popupItemText: {
+    color: '#3c4043',
+    fontSize: 15,
+    marginLeft: 12,
+  },
+  popupItemTextActive: {
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  popupTitle: {
+    color: '#202124',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  freqRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  freqLabel: {
+    color: '#5f6368',
+    fontSize: 14,
+    fontWeight: '600',
+    width: 50,
+  },
+  freqInput: {
+    backgroundColor: '#f1f3f4',
+    borderRadius: 8,
+    fontSize: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    textAlign: 'center',
+    width: 50,
+  },
+  unitScroll: {
+    flex: 1,
+  },
+  unitBtn: {
+    backgroundColor: '#f1f3f4',
+    borderRadius: 16,
+    marginRight: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  unitBtnActive: {
+    backgroundColor: '#202124',
+  },
+  unitText: {
+    color: '#5f6368',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  unitTextActive: {
+    color: '#fff',
+  },
+  dateRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  dateInput: {
+    backgroundColor: '#f1f3f4',
+    borderRadius: 8,
+    flex: 1,
+    fontSize: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  doneBtn: {
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+    paddingVertical: 12,
+  },
+  doneBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
