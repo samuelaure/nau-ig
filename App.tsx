@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ShareIntentProvider, useShareIntentContext } from '@/context/ShareIntentContext';
 import { FeedScreen } from '@/screens/FeedScreen';
 import { CaptureModal } from '@/components/CaptureModal';
@@ -62,11 +63,13 @@ export default function App(props: any) {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <ShareIntentProvider>
-        <MainLayout isCapture={props?.isCapture} />
-      </ShareIntentProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ShareIntentProvider>
+          <MainLayout isCapture={props?.isCapture} />
+        </ShareIntentProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
