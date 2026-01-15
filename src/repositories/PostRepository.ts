@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { executeSql, runSql } from '../db';
 
 export interface MediaItem {
   type: 'image' | 'video';
@@ -20,220 +20,101 @@ export interface Post {
   frequency: string;
 }
 
-export const getDuePosts = (tagFilter?: string | null): Promise<Post[]> => {
-  return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      let query = `SELECT * FROM posts WHERE (next_review_at <= datetime('now') OR next_review_at IS NULL)`;
-      const params: any[] = [];
+export const getDuePosts = async (tagFilter?: string | null): Promise<Post[]> => {
+  let query = `SELECT * FROM posts WHERE (next_review_at <= datetime('now') OR next_review_at IS NULL)`;
+  const params: any[] = [];
 
-      if (tagFilter) {
-        query += ` AND tags LIKE ?`;
-        params.push(`%${tagFilter}%`);
-      }
+  if (tagFilter) {
+    query += ` AND tags LIKE ?`;
+    params.push(`%${tagFilter}%`);
+  }
 
-      query += ` ORDER BY next_review_at ASC`;
-
-      tx.executeSql(
-        query,
-        params,
-        (_, { rows }) => resolve(rows._array),
-        (_, err) => {
-          reject(err);
-          return false;
-        }
-      );
-    });
-  });
+  query += ` ORDER BY next_review_at ASC`;
+  return executeSql<Post>(query, params);
 };
 
-export const getReviewedPosts = (
-  tagFilter?: string | null
-): Promise<Post[]> => {
-  return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      let query = `SELECT * FROM posts WHERE next_review_at > datetime('now')`;
-      const params: any[] = [];
+export const getReviewedPosts = async (tagFilter?: string | null): Promise<Post[]> => {
+  let query = `SELECT * FROM posts WHERE next_review_at > datetime('now')`;
+  const params: any[] = [];
 
-      if (tagFilter) {
-        query += ` AND tags LIKE ?`;
-        params.push(`%${tagFilter}%`);
-      }
+  if (tagFilter) {
+    query += ` AND tags LIKE ?`;
+    params.push(`%${tagFilter}%`);
+  }
 
-      query += ` ORDER BY next_review_at DESC`;
-
-      tx.executeSql(
-        query,
-        params,
-        (_, { rows }) => resolve(rows._array),
-        (_, err) => {
-          reject(err);
-          return false;
-        }
-      );
-    });
-  });
+  query += ` ORDER BY next_review_at DESC`;
+  return executeSql<Post>(query, params);
 };
 
 /**
  * Fetches all unique tags used across all posts to populate the Filter Bar.
  */
-export const getAllTags = (): Promise<string[]> => {
-  return new Promise((resolve) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        `SELECT tags FROM posts WHERE tags IS NOT NULL`,
-        [],
-        (_, { rows }) => {
-          const allTags = new Set<string>();
-          rows._array.forEach((row) => {
-            try {
-              const tags: string[] = JSON.parse(row.tags);
-              tags.forEach((t) => allTags.add(t));
-            } catch (e) {
-              /* ignore parse errors */
-            }
-          });
-          resolve(Array.from(allTags));
-        },
-        () => {
-          resolve([]);
-          return false;
-        }
-      );
+export const getAllTags = async (): Promise<string[]> => {
+  try {
+    const rows = await executeSql<{ tags: string }>(
+      'SELECT tags FROM posts WHERE tags IS NOT NULL',
+    );
+    const allTags = new Set<string>();
+    rows.forEach((row) => {
+      try {
+        const tags: string[] = JSON.parse(row.tags);
+        tags.forEach((t) => allTags.add(t));
+      } catch (e) {
+        /* ignore parse errors */
+      }
     });
-  });
+    return Array.from(allTags);
+  } catch (err) {
+    return [];
+  }
 };
 
-export const getPendingPosts = (): Promise<Post[]> => {
-  return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        `SELECT * FROM posts WHERE isProcessed = 0`,
-        [],
-        (_, { rows }) => resolve(rows._array),
-        (_, err) => {
-          reject(err);
-          return false;
-        }
-      );
-    });
-  });
+export const getPendingPosts = async (): Promise<Post[]> => {
+  return executeSql<Post>('SELECT * FROM posts WHERE isProcessed = 0');
 };
 
-export const updatePostFrequency = (
+export const updatePostFrequency = async (
   id: number,
-  direction: 'more' | 'less'
+  direction: 'more' | 'less',
 ): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        `UPDATE posts 
-         SET sm2_interval = CASE WHEN ? = 'more' THEN MAX(1, sm2_interval / 2) ELSE sm2_interval * 2 END,
-             next_review_at = datetime('now', '+' || (CASE WHEN ? = 'more' THEN MAX(1, sm2_interval / 2) ELSE sm2_interval * 2 END) || ' days')
-         WHERE id = ?`,
-        [direction, direction, id],
-        () => resolve(),
-        (_, err) => {
-          reject(err);
-          return false;
-        }
-      );
-    });
-  });
+  await runSql(
+    `UPDATE posts 
+     SET sm2_interval = CASE WHEN ? = 'more' THEN MAX(1, sm2_interval / 2) ELSE sm2_interval * 2 END,
+         next_review_at = datetime('now', '+' || (CASE WHEN ? = 'more' THEN MAX(1, sm2_interval / 2) ELSE sm2_interval * 2 END) || ' days')
+     WHERE id = ?`,
+    [direction, direction, id],
+  );
 };
 
-export const updatePostNote = (id: number, content: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        `UPDATE posts SET content = ? WHERE id = ?`,
-        [content, id],
-        () => resolve(),
-        (_, err) => {
-          reject(err);
-          return false;
-        }
-      );
-    });
-  });
+export const updatePostNote = async (id: number, content: string): Promise<void> => {
+  await runSql('UPDATE posts SET content = ? WHERE id = ?', [content, id]);
 };
 
-export const deletePost = (id: number): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        `DELETE FROM posts WHERE id = ?`,
-        [id],
-        () => resolve(),
-        (_, err) => {
-          reject(err);
-          return false;
-        }
-      );
-    });
-  });
+export const deletePost = async (id: number): Promise<void> => {
+  await runSql('DELETE FROM posts WHERE id = ?', [id]);
 };
 
-export const markPostAsReviewed = (
-  id: number,
-  interval: number
-): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        `UPDATE posts 
-         SET next_review_at = datetime('now', '+' || ? || ' days'),
-             sm2_repetition = sm2_repetition + 1
-         WHERE id = ?`,
-        [interval, id],
-        () => resolve(),
-        (_, err) => {
-          reject(err);
-          return false;
-        }
-      );
-    });
-  });
+export const markPostAsReviewed = async (id: number, interval: number): Promise<void> => {
+  await runSql(
+    `UPDATE posts 
+     SET next_review_at = datetime('now', '+' || ? || ' days'),
+         sm2_repetition = sm2_repetition + 1
+     WHERE id = ?`,
+    [interval, id],
+  );
 };
 
-export const updatePostMedia = (
-  id: number,
-  mediaData: MediaItem[]
-): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        `UPDATE posts SET mediaData = ?, isProcessed = 1 WHERE id = ?`,
-        [JSON.stringify(mediaData), id],
-        () => resolve(),
-        (_, err) => {
-          reject(err);
-          return false;
-        }
-      );
-    });
-  });
+export const updatePostMedia = async (id: number, mediaData: MediaItem[]): Promise<void> => {
+  await runSql('UPDATE posts SET mediaData = ?, isProcessed = 1 WHERE id = ?', [
+    JSON.stringify(mediaData),
+    id,
+  ]);
 };
 
-export const savePost = (post: any): Promise<number> => {
-  return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        `INSERT INTO posts (instagramUrl, title, content, tags, frequency, sm2_interval, isProcessed, next_review_at) 
-         VALUES (?, ?, ?, ?, ?, 1, 0, datetime('now'))`,
-        [
-          post.instagramUrl,
-          post.title,
-          post.content,
-          JSON.stringify(post.tags),
-          post.frequency
-        ],
-        (_, result) => resolve(result.insertId || 0),
-        (_, error) => {
-          reject(error);
-          return false;
-        }
-      );
-    });
-  });
+export const savePost = async (post: any): Promise<number> => {
+  return runSql(
+    `INSERT INTO posts (instagramUrl, title, content, tags, frequency, sm2_interval, isProcessed, next_review_at) 
+     VALUES (?, ?, ?, ?, ?, 1, 0, datetime('now'))`,
+    [post.instagramUrl, post.title, post.content, JSON.stringify(post.tags), post.frequency],
+  );
 };
