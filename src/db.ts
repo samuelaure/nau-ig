@@ -65,6 +65,8 @@ export const initDb = async (): Promise<void> => {
       frequency TEXT,
       mediaData TEXT,
       isProcessed INTEGER DEFAULT 0,
+      sync_attempts INTEGER DEFAULT 0,
+      sync_status TEXT DEFAULT 'pending',
       sm2_interval INTEGER DEFAULT 1,
       sm2_repetition INTEGER DEFAULT 0,
       sm2_ease_factor REAL DEFAULT 2.5,
@@ -72,6 +74,14 @@ export const initDb = async (): Promise<void> => {
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // Migration for existing databases
+  try {
+    await runSql('ALTER TABLE posts ADD COLUMN sync_attempts INTEGER DEFAULT 0');
+    await runSql("ALTER TABLE posts ADD COLUMN sync_status TEXT DEFAULT 'pending'");
+  } catch (e) {
+    // Columns likely already exist
+  }
 
   await runSql(`
     CREATE TABLE IF NOT EXISTS settings (

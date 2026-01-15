@@ -18,6 +18,8 @@ export interface Post {
   sm2_ease_factor: number;
   sm2_repetition: number;
   frequency: string;
+  sync_attempts: number;
+  sync_status: 'pending' | 'processed' | 'standby';
 }
 
 export const getDuePosts = async (tagFilter?: string | null): Promise<Post[]> => {
@@ -69,8 +71,35 @@ export const getAllTags = async (): Promise<string[]> => {
   }
 };
 
-export const getPendingPosts = async (): Promise<Post[]> => {
-  return executeSql<Post>('SELECT * FROM posts WHERE isProcessed = 0');
+export const getPendingPosts = async (maxAttempts = 10): Promise<Post[]> => {
+  return executeSql<Post>(
+    "SELECT * FROM posts WHERE isProcessed = 0 AND sync_status = 'pending' AND sync_attempts < ?",
+    [maxAttempts],
+  );
+};
+
+export const incrementSyncAttempts = async (id: number): Promise<void> => {
+  await runSql('UPDATE posts SET sync_attempts = sync_attempts + 1 WHERE id = ?', [id]);
+};
+
+export const updateSyncStatus = async (
+  id: number,
+  status: 'pending' | 'standby' | 'processed',
+): Promise<void> => {
+  await runSql('UPDATE posts SET sync_status = ? WHERE id = ?', [status, id]);
+};
+
+export const resetSyncForManualRetry = async (ids: number[]): Promise<void> => {
+  if (ids.length === 0) return;
+  const placeholders = ids.map(() => '?').join(',');
+  await runSql(
+    `UPDATE posts SET sync_attempts = 0, sync_status = 'pending' WHERE id IN (\${placeholders})`,
+    ids,
+  );
+};
+
+export const getStandbyPosts = async (): Promise<Post[]> => {
+  return executeSql<Post>("SELECT * FROM posts WHERE sync_status = 'standby' OR sync_attempts >= 10");
 };
 
 export const updatePostFrequency = async (
@@ -105,10 +134,10 @@ export const markPostAsReviewed = async (id: number, interval: number): Promise<
 };
 
 export const updatePostMedia = async (id: number, mediaData: MediaItem[]): Promise<void> => {
-  await runSql('UPDATE posts SET mediaData = ?, isProcessed = 1 WHERE id = ?', [
-    JSON.stringify(mediaData),
-    id,
-  ]);
+  await runSql(
+    "UPDATE posts SET mediaData = ?, isProcessed = 1, sync_status = 'processed' WHERE id = ?",
+    [JSON.stringify(mediaData), id],
+  );
 };
 
 export const savePost = async (post: any): Promise<number> => {

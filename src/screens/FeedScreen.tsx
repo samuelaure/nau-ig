@@ -18,6 +18,8 @@ import {
   getPendingPosts,
   getAllTags,
   updatePostMedia,
+  incrementSyncAttempts,
+  updateSyncStatus,
   Post,
 } from '@/repositories/PostRepository';
 import { getSetting } from '@/repositories/SettingsRepository';
@@ -56,8 +58,16 @@ export const FeedScreen = () => {
     const webhookUrl = await getSetting('make_webhook_url');
     if (!webhookUrl) return;
 
-    const pending = await getPendingPosts();
-    if (pending.length === 0) return;
+    // Only get posts that haven't hit the 10-attempt limit
+    const MAX_ATTEMPTS = 10;
+    const pending = await getPendingPosts(MAX_ATTEMPTS);
+
+    if (pending.length === 0) {
+      // No requests are made if no eligible captures exist
+      return;
+    }
+
+    console.log(`[Sync] Processing ${pending.length} pending captures...`);
 
     try {
       const response = await sendToMake(webhookUrl, {
@@ -67,16 +77,28 @@ export const FeedScreen = () => {
 
       if (response.status === 'success' && response.results) {
         let hasUpdates = false;
-        for (const [postId, result] of Object.entries(response.results)) {
-          if (result.status === 'success' && result.mediaData) {
-            await updatePostMedia(Number(postId), result.mediaData);
+        for (const p of pending) {
+          const result = response.results[p.id];
+
+          if (result?.status === 'success' && result.mediaData) {
+            await updatePostMedia(p.id, result.mediaData);
             hasUpdates = true;
+          } else {
+            // If still pending or error, increment attempt counter
+            await incrementSyncAttempts(p.id);
+
+            // Check if it just hit the limit
+            if (p.sync_attempts + 1 >= MAX_ATTEMPTS) {
+              console.log(`[Sync] Post ${p.id} reached retry limit. Moving to Standby.`);
+              await updateSyncStatus(p.id, 'standby');
+            }
           }
         }
         if (hasUpdates) loadFeed();
       }
     } catch (e) {
-      // Silent fail for polling
+      console.error('[Sync] Batch request failed:', e);
+      // Optional: increment all on catch, or wait for next interval
     }
   }, [loadFeed]);
 
