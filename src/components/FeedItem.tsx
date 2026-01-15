@@ -14,18 +14,19 @@ import {
 import { Video, ResizeMode } from 'expo-av';
 import {
   MoreHorizontal,
-  Repeat,
   CheckCircle2,
   DownloadCloud,
   Eye,
-  EyeOff
+  EyeOff,
+  ChevronUp,
+  ChevronDown,
+  Check
 } from 'lucide-react-native';
 import { TapGestureHandler, State } from 'react-native-gesture-handler';
 import { MediaCacheService } from '@/services/MediaCacheService';
 import {
   Post,
   MediaItem,
-  updatePostFrequency,
   markPostAsReviewed,
   updatePostNote,
   updatePostTitle,
@@ -52,6 +53,9 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
   const [noteDraft, setNoteDraft] = useState(post.content || '');
   const [showOriginalCaption, setShowOriginalCaption] = useState(false);
 
+  // Frequency Stage State (Local only until committed)
+  const [draftInterval, setDraftInterval] = useState(post.sm2_interval || 1);
+
   // Menu State
   const [menuVisible, setMenuVisible] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
@@ -67,7 +71,8 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
   useEffect(() => {
     setTitleDraft(post.title || '');
     setNoteDraft(post.content || '');
-  }, [post.title, post.content]);
+    setDraftInterval(post.sm2_interval || 1);
+  }, [post.title, post.content, post.sm2_interval]);
 
   useEffect(() => {
     if (post.isProcessed === 0) {
@@ -143,15 +148,13 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
     };
   }, [titleDraft, noteDraft, isEditing, handlePersist]);
 
-  const handleFrequencyChange = async (direction: 'more' | 'less') => {
-    setIsUpdating(true);
-    try {
-      await updatePostFrequency(post.id, direction);
-      onProcessed();
-    } catch (e) {
-      console.error('Failed to update frequency', e);
-    } finally {
-      setIsUpdating(false);
+  const handleIntervalDraft = (direction: 'up' | 'down') => {
+    if (direction === 'down') {
+      // Study more often = interval gets smaller
+      setDraftInterval(prev => Math.max(1, Math.round(prev / 2)));
+    } else {
+      // Study less often = interval gets larger
+      setDraftInterval(prev => prev * 2);
     }
   };
 
@@ -159,7 +162,7 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
     if (isHistory || post.isProcessed === 0) return;
     setIsUpdating(true);
     try {
-      await markPostAsReviewed(post.id, post.sm2_interval);
+      await markPostAsReviewed(post.id, draftInterval);
       onProcessed();
     } catch (e) {
       console.error('Failed to mark as reviewed', e);
@@ -204,9 +207,7 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
     return <Image source={source} style={styles.media} resizeMode="cover" />;
   };
 
-  // Logic to handle blur when clicking away
   const onBlurWrapper = () => {
-    // Small timeout to allow focus to move to the other input if tapped directly
     setTimeout(() => {
       if (!titleInputRef.current?.isFocused() && !noteInputRef.current?.isFocused()) {
         setIsEditing(false);
@@ -215,9 +216,11 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
     }, 100);
   };
 
+  const isDrafed = draftInterval !== post.sm2_interval;
+
   return (
     <View style={styles.container}>
-      {/* 1. Instagram-like Header (Standard Padding) */}
+      {/* 1. Instagram-like Header (16px Padding) */}
       <View style={styles.igHeader}>
         <View style={styles.igUserInfo}>
           <View style={styles.igAvatarPlaceholder}>
@@ -257,7 +260,7 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
         )}
       </View>
 
-      {/* 2. Media Carousel (Zero Padding) */}
+      {/* 2. Media Carousel (0px Padding) */}
       <TapGestureHandler
         onHandlerStateChange={onDoubleTap}
         numberOfTaps={2}
@@ -292,25 +295,14 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
         </View>
       </TapGestureHandler>
 
-      {/* 3. Custom Buttons Row (Standard Padding) */}
-      <View style={styles.actionsRow}>
-        <View style={styles.controlsGroup}>
-          <TouchableOpacity style={styles.controlBtn} onPress={() => handleFrequencyChange('less')} disabled={isUpdating}>
-            <Text style={styles.controlBtnText}>Less</Text>
-          </TouchableOpacity>
-          <View style={styles.intervalBadge}>
-            <Text style={styles.intervalText}>{post.sm2_interval}d</Text>
-          </View>
-          <TouchableOpacity style={styles.controlBtn} onPress={() => handleFrequencyChange('more')} disabled={isUpdating}>
-            <Text style={styles.controlBtnText}>More</Text>
-          </TouchableOpacity>
-        </View>
-
+      {/* 3. Refactored Review Bar (16px Padding) */}
+      {/* Structure: Done | Current frequency | Less | More */}
+      <View style={styles.reviewBar}>
         <TouchableOpacity
           style={[
-            styles.reviewBtn,
-            isHistory && styles.reviewBtnSuccess,
-            post.isProcessed === 0 && styles.reviewBtnLocked,
+            styles.doneBtn,
+            isHistory && styles.doneBtnSuccess,
+            post.isProcessed === 0 && styles.doneBtnLocked,
           ]}
           onPress={handleReviewed}
           disabled={isUpdating || isHistory || post.isProcessed === 0}
@@ -318,16 +310,50 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
           {isUpdating ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : isHistory ? (
-            <CheckCircle2 size={22} color="#fff" />
+            <CheckCircle2 size={18} color="#fff" />
           ) : (
-            <Repeat size={20} color="#fff" />
+            <Check size={18} color="#fff" strokeWidth={3} />
           )}
+          <Text style={styles.doneBtnText}>{isHistory ? 'Done' : 'Done'}</Text>
         </TouchableOpacity>
+
+        <View style={styles.rightActionsGroup}>
+          <View style={styles.freqDisplayContainer}>
+            <Text style={[styles.freqLabel, isDrafed && styles.freqLabelStale]}>
+              {post.sm2_interval}d
+            </Text>
+            {isDrafed && (
+              <>
+                <Text style={styles.freqArrow}>→</Text>
+                <Text style={styles.freqLabelNew}>{draftInterval}d</Text>
+              </>
+            )}
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.stepControls}>
+            <TouchableOpacity
+              style={styles.stepBtnIcon}
+              onPress={() => handleIntervalDraft('down')}
+              disabled={isUpdating}
+            >
+              <ChevronDown size={22} color="#64748b" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.stepBtnIcon}
+              onPress={() => handleIntervalDraft('up')}
+              disabled={isUpdating}
+            >
+              <ChevronUp size={22} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
-      {/* 4. Caption / Notes Section (Bigger Padding) */}
+      {/* 4. Caption Area (30px Padding) */}
       <View style={styles.captionArea}>
-        {/* Title Block */}
         {isEditing ? (
           <TextInput
             ref={titleInputRef}
@@ -343,7 +369,6 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
           </TouchableOpacity>
         )}
 
-        {/* Note-Caption Block */}
         {isEditing ? (
           <View style={styles.editorContainer}>
             <TextInput
@@ -357,7 +382,6 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
               placeholderTextColor="#94a3b8"
             />
 
-            {/* Reference Toggle */}
             {post.instagram_caption ? (
               <View style={styles.originalCaptionSection}>
                 <TouchableOpacity
@@ -390,7 +414,6 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
           </TouchableOpacity>
         )}
 
-        {/* Label Pills */}
         {tags.length > 0 && (
           <View style={styles.labelPillsRow}>
             {tags.map((tag, idx) => (
@@ -416,7 +439,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginBottom: 24,
   },
-  // 1. IG Header (Standard Padding: 16px)
+  // 1. IG Header (16px)
   igHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -483,7 +506,7 @@ const styles = StyleSheet.create({
   menuItemTextConfirm: {
     color: '#fff',
   },
-  // 2. Media Carousel (Zero Padding)
+  // 2. Media Carousel (0px)
   mediaWrapper: {
     width: width,
     height: width,
@@ -515,71 +538,106 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontSize: 12,
   },
-  // 3. Actions Row (Standard Padding: 16px)
-  actionsRow: {
+  // --- 3. Review Bar (16px) ---
+  reviewBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
+    justifyContent: 'space-between',
   },
-  controlsGroup: {
+  rightActionsGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 22,
-    padding: 4,
+    gap: 12,
   },
-  controlBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  controlBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  intervalBadge: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-  },
-  intervalText: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#0f172a',
-  },
-  reviewBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  doneBtn: {
+    height: 42,
+    paddingHorizontal: 16,
     backgroundColor: '#2563eb',
-    justifyContent: 'center',
+    borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    elevation: 4,
+    justifyContent: 'center',
+    gap: 6,
+    elevation: 2,
     shadowColor: '#2563eb',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
   },
-  reviewBtnSuccess: {
+  doneBtnSuccess: {
     backgroundColor: '#10b981',
     shadowColor: '#10b981',
   },
-  reviewBtnLocked: {
+  doneBtnLocked: {
     backgroundColor: '#e2e8f0',
     elevation: 0,
     shadowOpacity: 0,
   },
-  // 4. Caption Area (Bigger Padding: 30px)
+  doneBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  freqDisplayContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  freqLabel: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  freqLabelStale: {
+    color: '#94a3b8',
+    textDecorationLine: 'line-through',
+    backgroundColor: 'transparent',
+  },
+  freqArrow: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '700',
+  },
+  freqLabelNew: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#2563eb',
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  divider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#e2e8f0',
+  },
+  stepControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  stepBtnIcon: {
+    width: 38,
+    height: 38,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  // --- 4. Caption Area (30px) ---
   captionArea: {
-    paddingHorizontal: 30, // Distinctly larger padding
+    paddingHorizontal: 30,
     paddingBottom: 24,
   },
   postTitle: {
