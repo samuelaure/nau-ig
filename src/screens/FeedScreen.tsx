@@ -7,20 +7,41 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Settings, LayoutGrid, Clock, Tag as TagIcon } from 'lucide-react-native';
+import {
+  Menu,
+  LayoutGrid,
+  Clock,
+  Trash2,
+  X,
+  RotateCcw,
+  Trash,
+  Settings,
+  Tag as TagIcon
+} from 'lucide-react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { FeedItem } from '@/components/FeedItem';
 import { SettingsModal } from '@/components/SettingsModal';
 import {
   getDuePosts,
   getReviewedPosts,
+  getDeletedPosts,
   getAllTags,
   Post,
+  untrashPost,
+  deletePost,
 } from '@/repositories/PostRepository';
 import { syncManager } from '@/services/SyncManager';
 
-type FeedTab = 'due' | 'reviewed';
+type FeedTab = 'due' | 'reviewed' | 'trash';
+const { width } = Dimensions.get('window');
 
 export const FeedScreen = () => {
   const insets = useSafeAreaInsets();
@@ -30,11 +51,32 @@ export const FeedScreen = () => {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
+
+  // Animation values for Sidebar
+  const sidebarOffset = useSharedValue(-width * 0.85);
+  const overlayOpacity = useSharedValue(0);
+
+  const toggleSidebar = () => {
+    const nextState = !sidebarVisible;
+    setSidebarVisible(nextState);
+    sidebarOffset.value = withSpring(nextState ? 0 : -width * 0.85, {
+      damping: 20,
+      stiffness: 90
+    });
+    overlayOpacity.value = withTiming(nextState ? 1 : 0, { duration: 300 });
+  };
 
   const loadFeed = useCallback(async () => {
     try {
-      const data =
-        activeTab === 'due' ? await getDuePosts(selectedTag) : await getReviewedPosts(selectedTag);
+      let data: Post[] = [];
+      if (activeTab === 'due') {
+        data = await getDuePosts(selectedTag);
+      } else if (activeTab === 'reviewed') {
+        data = await getReviewedPosts(selectedTag);
+      } else if (activeTab === 'trash') {
+        data = await getDeletedPosts();
+      }
       setPosts(data);
 
       const tags = await getAllTags();
@@ -46,15 +88,10 @@ export const FeedScreen = () => {
 
   useEffect(() => {
     loadFeed();
-
-    // Wake up the sync service (it will shut itself down if nothing to do)
     syncManager.triggerSync(15000);
-
-    // Subscribe to sync events to automatically refresh the feed
     const unsubscribe = syncManager.subscribe(() => {
       loadFeed();
     });
-
     return () => {
       unsubscribe();
       syncManager.stop();
@@ -63,44 +100,108 @@ export const FeedScreen = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // Explicitly trigger a sync on pull-to-refresh
     await syncManager.performSync();
     await loadFeed();
     setRefreshing(false);
   };
 
+  const handleTabChange = (tab: FeedTab) => {
+    setActiveTab(tab);
+    toggleSidebar();
+  };
+
+  const handleUntrash = async (id: number) => {
+    await untrashPost(id);
+    loadFeed();
+  };
+
+  const handlePermanentDelete = async (id: number) => {
+    await deletePost(id);
+    loadFeed();
+  };
+
+  const getHeaderTitle = () => {
+    switch (activeTab) {
+      case 'due': return 'To Review';
+      case 'reviewed': return 'History';
+      case 'trash': return 'Trash';
+      default: return '9naŭ IG';
+    }
+  };
+
+  // Reanimated Styles
+  const sidebarStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: sidebarOffset.value }],
+  }));
+
+  const overlayStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+    display: overlayOpacity.value === 0 ? 'none' : 'flex',
+  }));
+
   return (
     <View style={styles.container}>
+      {/* Sidebar Overlay */}
+      <Animated.View style={[styles.overlay, overlayStyle]}>
+        <TouchableOpacity style={styles.overlayFill} activeOpacity={1} onPress={toggleSidebar} />
+      </Animated.View>
+
+      {/* Sidebar Surface */}
+      <Animated.View style={[styles.sidebar, sidebarStyle, { paddingTop: insets.top }]}>
+        <View style={styles.sidebarHeader}>
+          <Text style={styles.sidebarLogo}>9naŭ IG</Text>
+          <TouchableOpacity onPress={toggleSidebar}>
+            <X size={24} color="#000" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.sidebarContent}>
+          <TouchableOpacity
+            style={[styles.sidebarItem, activeTab === 'due' && styles.sidebarItemActive]}
+            onPress={() => handleTabChange('due')}
+          >
+            <LayoutGrid size={22} color={activeTab === 'due' ? '#2563eb' : '#4b5563'} />
+            <Text style={[styles.sidebarItemText, activeTab === 'due' && styles.sidebarItemTextActive]}>To Review</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.sidebarItem, activeTab === 'reviewed' && styles.sidebarItemActive]}
+            onPress={() => handleTabChange('reviewed')}
+          >
+            <Clock size={22} color={activeTab === 'reviewed' ? '#2563eb' : '#4b5563'} />
+            <Text style={[styles.sidebarItemText, activeTab === 'reviewed' && styles.sidebarItemTextActive]}>History</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.sidebarFooter}>
+          <TouchableOpacity
+            style={[styles.sidebarItem, activeTab === 'trash' && styles.sidebarItemActive]}
+            onPress={() => handleTabChange('trash')}
+          >
+            <Trash2 size={22} color={activeTab === 'trash' ? '#ef4444' : '#4b5563'} />
+            <Text style={[styles.sidebarItemText, activeTab === 'trash' && styles.sidebarItemTextActive]}>Trash</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.sidebarItem}
+            onPress={() => { setSettingsVisible(true); toggleSidebar(); }}
+          >
+            <Settings size={22} color="#4b5563" />
+            <Text style={styles.sidebarItemText}>Settings</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+
+      {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity style={styles.topBarSide} onPress={toggleSidebar}>
+          <Menu size={24} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.logo}>{getHeaderTitle()}</Text>
         <View style={styles.topBarSide} />
-        <Text style={styles.logo}>9naŭ IG</Text>
-        <TouchableOpacity style={styles.topBarSide} onPress={() => setSettingsVisible(true)}>
-          <Settings size={22} color="#000" />
-        </TouchableOpacity>
       </View>
 
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'due' && styles.activeTab]}
-          onPress={() => setActiveTab('due')}
-        >
-          <LayoutGrid size={20} color={activeTab === 'due' ? '#000' : '#9ca3af'} />
-          <Text style={[styles.tabText, activeTab === 'due' && styles.activeTabText]}>
-            To Review
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'reviewed' && styles.activeTab]}
-          onPress={() => setActiveTab('reviewed')}
-        >
-          <Clock size={20} color={activeTab === 'reviewed' ? '#000' : '#9ca3af'} />
-          <Text style={[styles.tabText, activeTab === 'reviewed' && styles.activeTabText]}>
-            History
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {availableTags.length > 0 && (
+      {activeTab !== 'trash' && availableTags.length > 0 && (
         <View style={styles.tagBarContainer}>
           <ScrollView
             horizontal
@@ -138,19 +239,40 @@ export const FeedScreen = () => {
       <FlatList
         data={posts}
         keyExtractor={(item) => `${activeTab}-${item.id}`}
-        renderItem={({ item }) => (
-          <FeedItem post={item} onProcessed={loadFeed} isHistory={activeTab === 'reviewed'} />
-        )}
+        renderItem={({ item }) => {
+          if (activeTab === 'trash') {
+            return (
+              <View style={styles.trashCard}>
+                <View style={styles.trashInfo}>
+                  <Text style={styles.trashTitle}>{item.title || 'Untitled Capture'}</Text>
+                  <Text style={styles.trashDate}>Deleted on {item.deleted_at}</Text>
+                </View>
+                <View style={styles.trashActions}>
+                  <TouchableOpacity onPress={() => handleUntrash(item.id)} style={styles.untrashBtn}>
+                    <RotateCcw size={20} color="#10b981" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handlePermanentDelete(item.id)} style={styles.permaDeleteBtn}>
+                    <Trash size={20} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          }
+          return <FeedItem post={item} onProcessed={loadFeed} isHistory={activeTab === 'reviewed'} />;
+        }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyText}>
-              {activeTab === 'due' ? 'You reached Review Zero!' : 'No history yet.'}
+              {activeTab === 'due' ? 'You reached Review Zero!' :
+                activeTab === 'reviewed' ? 'No history yet.' : 'Trash is empty.'}
             </Text>
             <Text style={styles.emptySubText}>
               {activeTab === 'due'
                 ? 'Great job! Check your history or capture more content.'
-                : 'Reviewed posts will appear here.'}
+                : activeTab === 'reviewed'
+                  ? 'Reviewed posts will appear here.'
+                  : 'Deleted captures will wait here until permanent cleanup.'}
             </Text>
           </View>
         }
@@ -170,16 +292,76 @@ export const FeedScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  activeTab: {
-    borderBottomColor: '#000',
-    borderBottomWidth: 2,
-  },
-  activeTabText: {
-    color: '#000',
-  },
   container: {
     backgroundColor: '#fff',
     flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 1000,
+  },
+  overlayFill: {
+    flex: 1,
+  },
+  sidebar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: width * 0.85,
+    backgroundColor: '#fff',
+    zIndex: 1001,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 5, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  sidebarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 30,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  sidebarLogo: {
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -1,
+    color: '#000',
+  },
+  sidebarContent: {
+    flex: 1,
+    paddingTop: 20,
+  },
+  sidebarItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 12,
+    gap: 15,
+    marginBottom: 4,
+  },
+  sidebarItemActive: {
+    backgroundColor: '#eff6ff',
+    borderRadius: 12,
+  },
+  sidebarItemText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4b5563',
+  },
+  sidebarItemTextActive: {
+    color: '#2563eb',
+  },
+  sidebarFooter: {
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    paddingBottom: 40,
+    paddingTop: 10,
   },
   empty: {
     alignItems: 'center',
@@ -201,38 +383,34 @@ const styles = StyleSheet.create({
   },
   logo: {
     color: '#000',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
-    letterSpacing: -1,
-    textAlign: 'center',
+    letterSpacing: -0.5,
   },
-  tab: {
+  topBar: {
     alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'center',
-    paddingVertical: 12,
-  },
-  tabContainer: {
+    backgroundColor: '#fff',
     borderBottomColor: '#f3f4f6',
     borderBottomWidth: 1,
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 15,
+    paddingHorizontal: 16,
   },
-  tabText: {
-    color: '#9ca3af',
-    fontSize: 14,
-    fontWeight: '600',
+  topBarSide: {
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    width: 40,
   },
   tagBarContainer: {
-    backgroundColor: '#fafafa',
-    borderBottomColor: '#f3f4f6',
+    backgroundColor: '#fff',
+    borderBottomColor: '#f1f5f9',
     borderBottomWidth: 1,
   },
   tagChip: {
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderColor: '#e5e7eb',
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
     borderRadius: 20,
     borderWidth: 1,
     flexDirection: 'row',
@@ -256,19 +434,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  topBar: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderBottomColor: '#f3f4f6',
-    borderBottomWidth: 1,
+  trashCard: {
     flexDirection: 'row',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: 12,
-    paddingHorizontal: 16,
   },
-  topBarSide: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    width: 40,
+  trashInfo: {
+    flex: 1,
+  },
+  trashTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  trashDate: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 4,
+  },
+  trashActions: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  untrashBtn: {
+    padding: 8,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 8,
+  },
+  permaDeleteBtn: {
+    padding: 8,
+    backgroundColor: '#fef2f2',
+    borderRadius: 8,
   },
 });
