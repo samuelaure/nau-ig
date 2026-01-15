@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nau.ig"
@@ -29,7 +31,6 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "./plugins/withAndroidShareIntentFix.js",
       [
         "expo-share-intent",
         {
@@ -40,7 +41,8 @@
             }
           }
         }
-      ]
+      ],
+      "./plugins/withAndroidShareTarget.js"
     ]
   }
 }

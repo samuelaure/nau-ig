@@ -1,13 +1,10 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import {
-  ShareIntentProvider,
-  useShareIntentContext
-} from './src/context/ShareIntentContext';
-import { FeedScreen } from './src/screens/FeedScreen';
-import { CaptureModal } from './src/components/CaptureModal';
-import { initDb } from './src/db';
+import { ShareIntentProvider, useShareIntentContext } from '@/context/ShareIntentContext';
+import { FeedScreen } from '@/screens/FeedScreen';
+import { CaptureModal } from '@/components/CaptureModal';
+import { initDb } from '@/db';
 
 const MainLayout = () => {
   const { hasShareIntent, value, resetShareIntent } = useShareIntentContext();
@@ -16,22 +13,17 @@ const MainLayout = () => {
     <View style={styles.container}>
       <StatusBar style="light" />
       <FeedScreen />
-      {hasShareIntent && (
-        <CaptureModal shareValue={value} onClose={resetShareIntent} />
-      )}
+      {hasShareIntent && <CaptureModal shareValue={value} onClose={resetShareIntent} />}
     </View>
   );
 };
 
 export default function App() {
   useEffect(() => {
-    (async () => {
-      try {
-        await initDb();
-      } catch (err) {
-        console.error('DB Init Error:', err);
-      }
-    })();
+    // Correctly await the DB initialization
+    initDb().catch((err) => {
+      console.error('CRITICAL: DB Init Error:', err);
+    });
   }, []);
 
   return (
@@ -43,7 +35,7 @@ export default function App() {
 
 const styles = StyleSheet.create({
   container: {
+    backgroundColor: '#000',
     flex: 1,
-    backgroundColor: '#000'
-  }
+  },
 });
