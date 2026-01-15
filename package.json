@@ -17,6 +17,7 @@
     "build:preview": "eas build -p android --profile preview"
   },
   "dependencies": {
+    "@react-native-community/datetimepicker": "7.7.0",
     "expo": "~50.0.6",
     "expo-av": "~13.10.6",
     "expo-clipboard": "~5.0.1",

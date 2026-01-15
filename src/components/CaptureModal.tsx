@@ -14,15 +14,17 @@ import {
   Animated,
   Modal,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   X,
   Plus,
   Link as LinkIcon,
-  Check,
   Tag as TagIcon,
   RotateCw,
   Square,
-  CheckSquare
+  CheckSquare,
+  ChevronDown,
+  Calendar as CalendarIcon,
 } from 'lucide-react-native';
 import { savePost, getAllTags } from '@/repositories/PostRepository';
 import { getSetting } from '@/repositories/SettingsRepository';
@@ -48,10 +50,13 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
   const [repeatInterval, setRepeatInterval] = useState('1');
   const [repeatUnit, setRepeatUnit] = useState('Days');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [pickerDate, setPickerDate] = useState(new Date());
 
   // Modal Visibility
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [showFreqPicker, setShowFreqPicker] = useState(false);
+  const [showUnitDropdown, setShowUnitDropdown] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -95,6 +100,23 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
         setSelectedTags([...selectedTags, tag]);
       }
       setNewTag('');
+    }
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setPickerDate(selectedDate);
+      setStartDate(selectedDate.toISOString().split('T')[0]);
+    }
+  };
+
+  const onTypeDate = (text: string) => {
+    setStartDate(text);
+    // Simple validation to update picker date if valid
+    const parsed = new Date(text);
+    if (!isNaN(parsed.getTime())) {
+      setPickerDate(parsed);
     }
   };
 
@@ -199,10 +221,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
 
         <View style={styles.bottomRow}>
           <View style={styles.actionsLeft}>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => setShowTagPicker(true)}
-            >
+            <TouchableOpacity style={styles.iconButton} onPress={() => setShowTagPicker(true)}>
               <TagIcon size={20} color="#5f6368" />
               {selectedTags.length > 0 && (
                 <View style={styles.badge}>
@@ -211,10 +230,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => setShowFreqPicker(true)}
-            >
+            <TouchableOpacity style={styles.iconButton} onPress={() => setShowFreqPicker(true)}>
               <RotateCw size={20} color="#5f6368" />
             </TouchableOpacity>
           </View>
@@ -236,7 +252,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
         {selectedTags.length > 0 && (
           <View style={styles.tagPreviewContainer}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {selectedTags.map(tag => (
+              {selectedTags.map((tag) => (
                 <View key={tag} style={styles.previewTag}>
                   <Text style={styles.previewTagText}>{tag}</Text>
                 </View>
@@ -271,7 +287,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.popupList}>
-              {existingTags.map(tag => {
+              {existingTags.map((tag) => {
                 const isSelected = selectedTags.includes(tag);
                 return (
                   <TouchableOpacity
@@ -279,8 +295,14 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
                     style={styles.popupItem}
                     onPress={() => toggleTag(tag)}
                   >
-                    {isSelected ? <CheckSquare size={18} color={COLORS.primary} /> : <Square size={18} color="#5f6368" />}
-                    <Text style={[styles.popupItemText, isSelected && styles.popupItemTextActive]}>{tag}</Text>
+                    {isSelected ? (
+                      <CheckSquare size={18} color={COLORS.primary} />
+                    ) : (
+                      <Square size={18} color="#5f6368" />
+                    )}
+                    <Text style={[styles.popupItemText, isSelected && styles.popupItemTextActive]}>
+                      {tag}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
@@ -294,12 +316,18 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
         visible={showFreqPicker}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowFreqPicker(false)}
+        onRequestClose={() => {
+          setShowFreqPicker(false);
+          setShowUnitDropdown(false);
+        }}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setShowFreqPicker(false)}
+          onPress={() => {
+            setShowFreqPicker(false);
+            setShowUnitDropdown(false);
+          }}
         >
           <View style={styles.popupContent} onStartShouldSetResponder={() => true}>
             <Text style={styles.popupTitle}>Repetition</Text>
@@ -312,32 +340,76 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
                 value={repeatInterval}
                 onChangeText={setRepeatInterval}
               />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.unitScroll}>
-                {UNITS.map(u => (
-                  <TouchableOpacity
-                    key={u}
-                    onPress={() => setRepeatUnit(u)}
-                    style={[styles.unitBtn, repeatUnit === u && styles.unitBtnActive]}
-                  >
-                    <Text style={[styles.unitText, repeatUnit === u && styles.unitTextActive]}>{u}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+
+              <View style={styles.dropdownContainer}>
+                <TouchableOpacity
+                  style={styles.dropdownTrigger}
+                  onPress={() => setShowUnitDropdown(!showUnitDropdown)}
+                >
+                  <Text style={styles.dropdownValue}>{repeatUnit}</Text>
+                  <ChevronDown size={16} color="#5f6368" />
+                </TouchableOpacity>
+
+                {showUnitDropdown && (
+                  <View style={styles.dropdownList}>
+                    {UNITS.map((u) => (
+                      <TouchableOpacity
+                        key={u}
+                        style={styles.dropdownItem}
+                        onPress={() => {
+                          setRepeatUnit(u);
+                          setShowUnitDropdown(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.dropdownItemText,
+                            repeatUnit === u && styles.dropdownItemTextActive,
+                          ]}
+                        >
+                          {u}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
             </View>
 
             <View style={styles.dateRow}>
               <Text style={styles.freqLabel}>Starts</Text>
-              <TextInput
-                style={styles.dateInput}
-                value={startDate}
-                onChangeText={setStartDate}
-                placeholder="YYYY-MM-DD"
-              />
+              <View style={styles.dateInputWrapper}>
+                <TextInput
+                  style={styles.dateInput}
+                  value={startDate}
+                  onChangeText={onTypeDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#9ca3af"
+                />
+                <TouchableOpacity
+                  style={styles.calendarTrigger}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <CalendarIcon size={18} color={COLORS.primary} />
+                </TouchableOpacity>
+              </View>
             </View>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={pickerDate}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+              />
+            )}
 
             <TouchableOpacity
               style={styles.doneBtn}
-              onPress={() => setShowFreqPicker(false)}
+              onPress={() => {
+                setShowFreqPicker(false);
+                setShowUnitDropdown(false);
+              }}
             >
               <Text style={styles.doneBtnText}>Done</Text>
             </TouchableOpacity>
@@ -429,7 +501,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   saveButton: {
-    backgroundColor: '#a34d20', // Matches the brown-ish tone in Google Keep screenshot
+    backgroundColor: '#a34d20',
     borderRadius: 24,
     paddingHorizontal: 24,
     paddingVertical: 12,
@@ -458,7 +530,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  // Popup Styles
   modalOverlay: {
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -470,7 +541,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     maxHeight: '60%',
     padding: 16,
-    width: '80%',
+    width: '85%',
+    maxWidth: 340,
   },
   popupHeader: {
     alignItems: 'center',
@@ -508,13 +580,14 @@ const styles = StyleSheet.create({
     color: '#202124',
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   freqRow: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 20,
+    zIndex: 10, // For dropdown overlap
   },
   freqLabel: {
     color: '#5f6368',
@@ -531,26 +604,48 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     width: 50,
   },
-  unitScroll: {
+  dropdownContainer: {
     flex: 1,
+    position: 'relative',
   },
-  unitBtn: {
+  dropdownTrigger: {
+    alignItems: 'center',
     backgroundColor: '#f1f3f4',
-    borderRadius: 16,
-    marginRight: 6,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
-  unitBtnActive: {
-    backgroundColor: '#202124',
-  },
-  unitText: {
-    color: '#5f6368',
-    fontSize: 12,
+  dropdownValue: {
+    color: '#3c4043',
+    fontSize: 14,
     fontWeight: '600',
   },
-  unitTextActive: {
-    color: '#fff',
+  dropdownList: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    elevation: 4,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    top: 40,
+    zIndex: 20,
+  },
+  dropdownItem: {
+    padding: 12,
+  },
+  dropdownItemText: {
+    color: '#3c4043',
+    fontSize: 14,
+  },
+  dropdownItemTextActive: {
+    color: COLORS.primary,
+    fontWeight: '600',
   },
   dateRow: {
     alignItems: 'center',
@@ -558,13 +653,23 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 24,
   },
-  dateInput: {
+  dateInputWrapper: {
+    alignItems: 'center',
     backgroundColor: '#f1f3f4',
     borderRadius: 8,
+    flex: 1,
+    flexDirection: 'row',
+    paddingRight: 8,
+  },
+  dateInput: {
+    color: '#3c4043',
     flex: 1,
     fontSize: 14,
     paddingHorizontal: 12,
     paddingVertical: 8,
+  },
+  calendarTrigger: {
+    padding: 4,
   },
   doneBtn: {
     alignItems: 'center',
