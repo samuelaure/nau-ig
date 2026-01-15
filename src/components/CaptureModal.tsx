@@ -26,6 +26,7 @@ import {
   CheckSquare,
   ChevronDown,
   Calendar as CalendarIcon,
+  Check,
 } from 'lucide-react-native';
 import { savePost, getAllTags } from '@/repositories/PostRepository';
 import { getSetting } from '@/repositories/SettingsRepository';
@@ -58,6 +59,16 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
   const [showFreqPicker, setShowFreqPicker] = useState(false);
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isFreqCustomized, setIsFreqCustomized] = useState(false);
+
+  // Clean the URL if it comes with prefix text (common in Instagram shares)
+  const cleanUrl = useRef('');
+  useEffect(() => {
+    if (shareValue) {
+      const urlMatch = shareValue.match(/https?:\/\/[^\s]+/);
+      cleanUrl.current = urlMatch ? urlMatch[0] : shareValue;
+    }
+  }, [shareValue]);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -84,6 +95,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
   };
 
   const toggleTag = (tag: string) => {
+    // We already ensure existingTags match case, but let's be safe
     if (selectedTags.includes(tag)) {
       setSelectedTags(selectedTags.filter((t) => t !== tag));
     } else {
@@ -92,17 +104,26 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
   };
 
   const addNewTag = () => {
-    const tag = newTag.trim().toLowerCase();
+    const tag = newTag.trim();
     if (tag) {
-      if (!existingTags.includes(tag)) {
-        setExistingTags([tag, ...existingTags]);
+      // Find case-insensitive match
+      const existing = existingTags.find(t => t.toLowerCase() === tag.toLowerCase());
+      const tagToUse = existing || tag;
+
+      if (!existing) {
+        setExistingTags([tagToUse, ...existingTags]);
       }
-      if (!selectedTags.includes(tag)) {
-        setSelectedTags([...selectedTags, tag]);
+
+      if (!selectedTags.includes(tagToUse)) {
+        setSelectedTags([...selectedTags, tagToUse]);
       }
       setNewTag('');
     }
   };
+
+  const filteredTags = existingTags.filter(t =>
+    t.toLowerCase().includes(newTag.toLowerCase())
+  );
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
@@ -146,11 +167,11 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
       return;
     }
 
-    console.log('[CaptureModal] handleSave started. shareValue:', shareValue);
+    console.log('[CaptureModal] handleSave started. shareValue:', cleanUrl.current);
     setIsSaving(true);
     try {
       const postData = {
-        instagramUrl: shareValue,
+        instagramUrl: cleanUrl.current,
         title: title || 'Instagram Capture',
         content: note,
         tags: selectedTags,
@@ -168,7 +189,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
         // Do NOT await the webhook so the UI closes immediately
         sendToMake(webhookUrl, {
           action: 'capture',
-          instagramUrl: shareValue,
+          instagramUrl: cleanUrl.current,
           postId: postId,
         }).then(() => console.log('[CaptureModal] Webhook async success'))
           .catch(err => console.warn('[CaptureModal] Webhook async failed:', err));
@@ -210,7 +231,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
         <View style={styles.urlHeader}>
           <LinkIcon size={10} color="#9ca3af" />
           <Text style={styles.urlText} numberOfLines={1}>
-            {shareValue?.replace('https://', '').replace('www.', '') || 'No URL'}
+            {cleanUrl.current.replace('https://', '').replace('www.', '') || 'No URL'}
           </Text>
         </View>
 
@@ -245,6 +266,11 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
 
             <TouchableOpacity style={styles.iconButton} onPress={() => setShowFreqPicker(true)}>
               <RotateCw size={20} color="#5f6368" />
+              {isFreqCustomized && (
+                <View style={[styles.badge, { backgroundColor: COLORS.success }]}>
+                  <Check size={10} color="#fff" />
+                </View>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -298,7 +324,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.popupList}>
-              {existingTags.map((tag) => {
+              {filteredTags.map((tag) => {
                 const isSelected = selectedTags.includes(tag);
                 return (
                   <TouchableOpacity
@@ -419,6 +445,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
               onPress={() => {
                 setShowFreqPicker(false);
                 setShowUnitDropdown(false);
+                setIsFreqCustomized(true);
               }}
             >
               <Text style={styles.doneBtnText}>Done</Text>

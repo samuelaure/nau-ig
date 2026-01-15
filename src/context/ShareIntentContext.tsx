@@ -30,7 +30,7 @@ export const ShareIntentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   return (
     <ShareIntentContext.Provider
       value={{
-        value: activeIntent?.value,
+        value: activeIntent?.value || activeIntent?.text || '',
         hasShareIntent: !!activeIntent,
         resetShareIntent: handleReset,
         error,
