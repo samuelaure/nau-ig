@@ -109,8 +109,8 @@ function withAndroidShareTarget(config) {
           { $: { name: 'android:windowBackground' }, _: '@android:color/transparent' },
           { $: { name: 'android:windowContentOverlay' }, _: '@null' },
           { $: { name: 'android:windowNoTitle' }, _: 'true' },
-          { $: { name: 'android:windowIsFloating' }, _: 'true' },
-          { $: { name: 'android:backgroundDimEnabled' }, _: 'true' },
+          { $: { name: 'android:windowIsFloating' }, _: 'false' },
+          { $: { name: 'android:backgroundDimEnabled' }, _: 'false' },
         ],
       });
     }

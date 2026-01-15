@@ -13,6 +13,7 @@ import {
   BackHandler,
   Animated,
   Modal,
+  ToastAndroid,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
@@ -143,28 +144,39 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
   const handleSave = async () => {
     if (!shareValue) return;
 
+    console.log('Starting save process for:', shareValue);
     setIsSaving(true);
     try {
-      const postId = await savePost({
+      const postData = {
         instagramUrl: shareValue,
         title: title || 'Instagram Capture',
         content: note,
         tags: selectedTags,
         frequency: `${repeatInterval} ${repeatUnit}`,
         startDate: startDate,
-      });
+      };
+
+      console.log('Saving post with data:', postData);
+      const postId = await savePost(postData);
+      console.log('Post saved successfully, ID:', postId);
 
       const webhookUrl = await getSetting('make_webhook_url');
       if (webhookUrl) {
+        console.log('Triggering webhook:', webhookUrl);
         try {
           await sendToMake(webhookUrl, {
             action: 'capture',
             instagramUrl: shareValue,
             postId: postId,
           });
+          console.log('Webhook triggered successfully');
         } catch (webhookErr) {
           console.warn('Webhook failed:', webhookErr);
         }
+      }
+
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Capture Saved!', ToastAndroid.SHORT);
       }
 
       handleClose();

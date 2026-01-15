@@ -114,7 +114,14 @@ export const updatePostMedia = async (id: number, mediaData: MediaItem[]): Promi
 export const savePost = async (post: any): Promise<number> => {
   return runSql(
     `INSERT INTO posts (instagramUrl, title, content, tags, frequency, sm2_interval, isProcessed, next_review_at) 
-     VALUES (?, ?, ?, ?, ?, 1, 0, datetime('now'))`,
-    [post.instagramUrl, post.title, post.content, JSON.stringify(post.tags), post.frequency],
+     VALUES (?, ?, ?, ?, ?, 1, 0, ?)`,
+    [
+      post.instagramUrl,
+      post.title,
+      post.content,
+      JSON.stringify(post.tags),
+      post.frequency,
+      post.startDate || new Date().toISOString().split('T')[0],
+    ],
   );
 };

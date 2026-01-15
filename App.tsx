@@ -60,11 +60,10 @@ export default function App(props: any) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent', // Root should be transparent for CaptureActivity
     flex: 1,
   },
   shareOverlay: {
-    // Transparent background so the Android dialog style shows the underlying activity (Instagram)
     backgroundColor: 'transparent',
     flex: 1,
   },
