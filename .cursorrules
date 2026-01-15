@@ -1,0 +1,6 @@
+# Windows Terminal Behavior Rules
+- This project is running on a Windows environment where the terminal often hangs on interactive shells.
+- **MANDATORY**: Always use `cmd /c` before any terminal command (e.g., `cmd /c npm test`).
+- **MANDATORY**: For any `run_command` call, set `WaitMsBeforeAsync` to at least `2000` to capture output before it goes to the background.
+- If a command fails or hangs, try wrapping it in PowerShell: `powershell -Command "[command]; exit"`.
+- Avoid using `&` for chaining commands; use `&&` or separate calls if using `cmd /c`.
