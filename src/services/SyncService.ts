@@ -1,4 +1,4 @@
-import { MediaItem } from '../repositories/PostRepository';
+import { MediaItem } from '@/repositories/PostRepository';
 
 interface SyncResult {
   status: 'success' | 'pending' | 'error';
@@ -22,7 +22,7 @@ export async function sendToMake(
     instagramUrl?: string;
     postId?: number;
     items?: { id: number; url: string }[];
-  }
+  },
 ): Promise<WebhookResponse> {
   let retries = 3;
   let delay = 1000;
@@ -35,8 +35,8 @@ export async function sendToMake(
         body: JSON.stringify({
           ...payload,
           timestamp: new Date().toISOString(),
-          platform: 'android'
-        })
+          platform: 'android',
+        }),
       });
 
       if (res.ok) return await res.json();

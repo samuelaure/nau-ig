@@ -29,11 +29,9 @@ export const MediaCacheService = {
   },
 
   clearCache: async () => {
-    const files = await FileSystem.readDirectoryAsync(
-      FileSystem.documentDirectory!
-    );
+    const files = await FileSystem.readDirectoryAsync(FileSystem.documentDirectory!);
     for (const file of files) {
       await FileSystem.deleteAsync(`${FileSystem.documentDirectory}${file}`);
     }
-  }
+  },
 };
