@@ -12,7 +12,14 @@ import {
   TextInput,
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
-import { MoreHorizontal, Repeat, CheckCircle2, DownloadCloud } from 'lucide-react-native';
+import {
+  MoreHorizontal,
+  Repeat,
+  CheckCircle2,
+  DownloadCloud,
+  Eye,
+  EyeOff
+} from 'lucide-react-native';
 import { TapGestureHandler, State } from 'react-native-gesture-handler';
 import { MediaCacheService } from '@/services/MediaCacheService';
 import {
@@ -21,6 +28,8 @@ import {
   updatePostFrequency,
   markPostAsReviewed,
   updatePostNote,
+  updatePostTitle,
+  moveToTrash,
 } from '@/repositories/PostRepository';
 
 const { width } = Dimensions.get('window');
@@ -37,13 +46,28 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
   const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Note Evolution State
-  const [isEditingNote, setIsEditingNote] = useState(false);
+  // Unified Editing Mode
+  const [isEditing, setIsEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(post.title || '');
   const [noteDraft, setNoteDraft] = useState(post.content || '');
+  const [showOriginalCaption, setShowOriginalCaption] = useState(false);
+
+  // Menu State
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   const doubleTapRef = useRef(null);
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
+
+  // Track if we need to blur properly
+  const titleInputRef = useRef<TextInput>(null);
+  const noteInputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    setTitleDraft(post.title || '');
+    setNoteDraft(post.content || '');
+  }, [post.title, post.content]);
 
   useEffect(() => {
     if (post.isProcessed === 0) {
@@ -61,13 +85,15 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
           }),
         ]),
       ).start();
+    } else {
+      pulseAnim.setValue(1);
     }
 
     const prepareMedia = async () => {
       if (post.tags) {
         try {
           setTags(JSON.parse(post.tags));
-        } catch (e) {}
+        } catch (e) { }
       }
 
       if (!post.mediaData || post.isProcessed === 0) {
@@ -92,31 +118,30 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
     prepareMedia();
   }, [post.mediaData, post.isProcessed, post.tags, pulseAnim]);
 
-  // Zero-Button Persistence: Auto-save logic
-  const persistNote = useCallback(
-    async (content: string) => {
-      if (content === post.content) return;
-      try {
-        await updatePostNote(post.id, content);
-      } catch (e) {
-        console.error('Failed to auto-save note', e);
+  const handlePersist = useCallback(
+    async () => {
+      if (titleDraft !== post.title) {
+        await updatePostTitle(post.id, titleDraft);
+      }
+      if (noteDraft !== post.content) {
+        await updatePostNote(post.id, noteDraft);
       }
     },
-    [post.id, post.content],
+    [post.id, post.title, post.content, titleDraft, noteDraft],
   );
 
-  // Debounced save (1.5s of inactivity)
+  // Debounced save while editing
   useEffect(() => {
-    if (isEditingNote) {
+    if (isEditing) {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
       saveTimeout.current = setTimeout(() => {
-        persistNote(noteDraft);
+        handlePersist();
       }, 1500);
     }
     return () => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
     };
-  }, [noteDraft, isEditingNote, persistNote]);
+  }, [titleDraft, noteDraft, isEditing, handlePersist]);
 
   const handleFrequencyChange = async (direction: 'more' | 'less') => {
     setIsUpdating(true);
@@ -143,6 +168,19 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!isConfirmingDelete) {
+      setIsConfirmingDelete(true);
+      return;
+    }
+    try {
+      await moveToTrash(post.id);
+      onProcessed();
+    } catch (e) {
+      console.error('Failed to delete post', e);
+    }
+  };
+
   const onDoubleTap = (event: any) => {
     if (event.nativeEvent.state === State.ACTIVE) {
       handleReviewed();
@@ -166,42 +204,75 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
     return <Image source={source} style={styles.media} resizeMode="cover" />;
   };
 
+  // Logic to handle blur when clicking away
+  const onBlurWrapper = () => {
+    // Small timeout to allow focus to move to the other input if tapped directly
+    setTimeout(() => {
+      if (!titleInputRef.current?.isFocused() && !noteInputRef.current?.isFocused()) {
+        setIsEditing(false);
+        handlePersist();
+      }
+    }, 100);
+  };
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.userSection}>
-          <View style={styles.avatarPlaceholder} />
-          <View>
-            <Text style={styles.username}>{post.title || 'Saved Post'}</Text>
-            <View style={styles.tagDisplayList}>
-              {tags.map((tag, idx) => (
-                <Text key={idx} style={styles.headerTagText}>
-                  #{tag}{' '}
-                </Text>
-              ))}
-            </View>
+      {/* 1. Instagram-like Header (Standard Padding) */}
+      <View style={styles.igHeader}>
+        <View style={styles.igUserInfo}>
+          <View style={styles.igAvatarPlaceholder}>
+            {post.profile_image ? (
+              <Image source={{ uri: post.profile_image }} style={styles.igAvatar} />
+            ) : null}
           </View>
+          <Text style={styles.igUsername}>{post.username || 'instagram_user'}</Text>
         </View>
-        <MoreHorizontal size={20} color="#666" />
+        <TouchableOpacity
+          style={styles.menuTrigger}
+          onPress={() => {
+            setMenuVisible(!menuVisible);
+            if (menuVisible) setIsConfirmingDelete(false);
+          }}
+        >
+          <MoreHorizontal size={20} color="#262626" />
+        </TouchableOpacity>
+
+        {menuVisible && (
+          <View style={styles.dropdownMenu}>
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                isConfirmingDelete && styles.menuItemConfirm
+              ]}
+              onPress={handleDelete}
+            >
+              <Text style={[
+                styles.menuItemText,
+                isConfirmingDelete && styles.menuItemTextConfirm
+              ]}>
+                {isConfirmingDelete ? 'Are you sure?' : 'Delete'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
+      {/* 2. Media Carousel (Zero Padding) */}
       <TapGestureHandler
         onHandlerStateChange={onDoubleTap}
         numberOfTaps={2}
         ref={doubleTapRef}
         enabled={post.isProcessed === 1}
       >
-        <View style={styles.mediaContainer}>
+        <View style={styles.mediaWrapper}>
           {post.isProcessed === 0 ? (
-            <Animated.View
-              style={[styles.media, styles.processingContainer, { opacity: pulseAnim }]}
-            >
-              <DownloadCloud size={40} color="#9ca3af" />
-              <Text style={styles.processingText}>Preparing media...</Text>
-              <ActivityIndicator size="small" color="#9ca3af" style={{ marginTop: 12 }} />
+            <Animated.View style={[styles.media, styles.processingBox, { opacity: pulseAnim }]}>
+              <DownloadCloud size={40} color="#94a3b8" />
+              <Text style={styles.processingTitle}>Syncing Media...</Text>
+              <ActivityIndicator size="small" color="#94a3b8" style={{ marginTop: 12 }} />
             </Animated.View>
           ) : loading ? (
-            <View style={[styles.media, styles.loadingPlaceholder]}>
+            <View style={[styles.media, styles.loadingBox]}>
               <ActivityIndicator color="#000" />
             </View>
           ) : media.length > 0 ? (
@@ -211,42 +282,35 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
-              keyExtractor={(item, index) => index.toString()}
+              keyExtractor={(_, index) => index.toString()}
             />
           ) : (
-            <View style={[styles.media, styles.loadingPlaceholder]}>
-              <Text style={styles.emptyMediaText}>Media error. Pull to refresh.</Text>
+            <View style={[styles.media, styles.errorBox]}>
+              <Text style={styles.errorText}>Media not available</Text>
             </View>
           )}
         </View>
       </TapGestureHandler>
 
-      <View style={styles.actions}>
-        <View style={styles.frequencyControlGroup}>
-          <TouchableOpacity
-            style={styles.freqActionBtn}
-            onPress={() => handleFrequencyChange('less')}
-            disabled={isUpdating}
-          >
-            <Text style={styles.freqBtnText}>Less</Text>
+      {/* 3. Custom Buttons Row (Standard Padding) */}
+      <View style={styles.actionsRow}>
+        <View style={styles.controlsGroup}>
+          <TouchableOpacity style={styles.controlBtn} onPress={() => handleFrequencyChange('less')} disabled={isUpdating}>
+            <Text style={styles.controlBtnText}>Less</Text>
           </TouchableOpacity>
-          <View style={styles.frequencyBadge}>
-            <Text style={styles.frequencyValue}>{post.sm2_interval}d</Text>
+          <View style={styles.intervalBadge}>
+            <Text style={styles.intervalText}>{post.sm2_interval}d</Text>
           </View>
-          <TouchableOpacity
-            style={styles.freqActionBtn}
-            onPress={() => handleFrequencyChange('more')}
-            disabled={isUpdating}
-          >
-            <Text style={styles.freqBtnText}>More</Text>
+          <TouchableOpacity style={styles.controlBtn} onPress={() => handleFrequencyChange('more')} disabled={isUpdating}>
+            <Text style={styles.controlBtnText}>More</Text>
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity
           style={[
-            styles.repeatCircle,
-            isHistory && styles.historyCircle,
-            post.isProcessed === 0 && styles.disabledCircle,
+            styles.reviewBtn,
+            isHistory && styles.reviewBtnSuccess,
+            post.isProcessed === 0 && styles.reviewBtnLocked,
           ]}
           onPress={handleReviewed}
           disabled={isUpdating || isHistory || post.isProcessed === 0}
@@ -261,40 +325,84 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
         </TouchableOpacity>
       </View>
 
-      {/* Note Evolution Canvas */}
-      <View style={styles.content}>
-        {isEditingNote ? (
+      {/* 4. Caption / Notes Section (Bigger Padding) */}
+      <View style={styles.captionArea}>
+        {/* Title Block */}
+        {isEditing ? (
           <TextInput
-            style={[styles.notes, styles.noteInput]}
-            value={noteDraft}
-            onChangeText={setNoteDraft}
-            multiline
-            autoFocus
-            onBlur={() => {
-              setIsEditingNote(false);
-              persistNote(noteDraft);
-            }}
-            placeholder="Expand your thoughts..."
-            placeholderTextColor="#9ca3af"
+            ref={titleInputRef}
+            style={[styles.postTitle, styles.inputReset]}
+            value={titleDraft}
+            onChangeText={setTitleDraft}
+            onBlur={onBlurWrapper}
+            placeholder="Title"
           />
         ) : (
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={styles.notePreview}
-            onPress={() => setIsEditingNote(true)}
-          >
-            {post.content ? (
-              <Text style={styles.notes}>
-                <Text style={styles.notesLabel}>My Notes: </Text>
-                {post.content}
-              </Text>
-            ) : (
-              <Text style={styles.emptyNotePlaceholder}>Tap to add your thoughts...</Text>
-            )}
+          <TouchableOpacity onPress={() => setIsEditing(true)}>
+            <Text style={styles.postTitle}>{post.title || 'Untitled Capture'}</Text>
           </TouchableOpacity>
         )}
+
+        {/* Note-Caption Block */}
+        {isEditing ? (
+          <View style={styles.editorContainer}>
+            <TextInput
+              ref={noteInputRef}
+              style={[styles.noteContent, styles.noteInput, styles.inputReset]}
+              value={noteDraft}
+              onChangeText={setNoteDraft}
+              multiline
+              onBlur={onBlurWrapper}
+              placeholder="Capture your thoughts..."
+              placeholderTextColor="#94a3b8"
+            />
+
+            {/* Reference Toggle */}
+            {post.instagram_caption ? (
+              <View style={styles.originalCaptionSection}>
+                <TouchableOpacity
+                  style={styles.captionToggle}
+                  onPress={() => setShowOriginalCaption(!showOriginalCaption)}
+                >
+                  <Text style={styles.captionToggleText}>
+                    {showOriginalCaption ? 'Hide Original Caption' : 'Show Original Caption (Reference)'}
+                  </Text>
+                  {showOriginalCaption ? <EyeOff size={14} color="#8e8e8e" /> : <Eye size={14} color="#8e8e8e" />}
+                </TouchableOpacity>
+
+                {showOriginalCaption && (
+                  <View style={styles.originalCaptionCard}>
+                    <Text style={styles.originalCaptionText}>{post.instagram_caption}</Text>
+                  </View>
+                )}
+              </View>
+            ) : null}
+          </View>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => setIsEditing(true)}
+            style={styles.noteDisplay}
+          >
+            <Text style={styles.noteContent}>
+              {post.content || <Text style={styles.placeholderText}>Tap to add a note or edit content...</Text>}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Label Pills */}
+        {tags.length > 0 && (
+          <View style={styles.labelPillsRow}>
+            {tags.map((tag, idx) => (
+              <View key={idx} style={styles.pill}>
+                <Text style={styles.pillText}>#{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         <View style={styles.footerInfo}>
-          <Text style={styles.date}>
+          <Text style={styles.reviewTimeline}>
             {isHistory ? 'Next review in' : 'Review due in'} {post.sm2_interval} days
           </Text>
         </View>
@@ -304,168 +412,268 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
 };
 
 const styles = StyleSheet.create({
-  actions: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 12,
-  },
-  avatarPlaceholder: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 16,
-    height: 32,
-    marginRight: 10,
-    width: 32,
-  },
   container: {
     backgroundColor: '#fff',
-    marginBottom: 12,
+    marginBottom: 24,
   },
-  content: {
-    paddingBottom: 16,
-    paddingHorizontal: 12,
+  // 1. IG Header (Standard Padding: 16px)
+  igHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    zIndex: 100,
   },
-  date: {
-    color: '#9ca3af',
-    fontSize: 11,
-    fontStyle: 'italic',
+  igUserInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  disabledCircle: {
-    backgroundColor: '#e5e7eb',
-    elevation: 0,
-    shadowOpacity: 0,
+  igAvatarPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    marginRight: 10,
+    overflow: 'hidden',
+    borderWidth: 0.5,
+    borderColor: '#e2e8f0',
   },
-  emptyMediaText: {
-    color: '#9ca3af',
+  igAvatar: {
+    width: '100%',
+    height: '100%',
+  },
+  igUsername: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#262626',
+  },
+  menuTrigger: {
+    padding: 4,
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    right: 12,
+    top: 50,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    zIndex: 1000,
+    minWidth: 160,
+    padding: 4,
+  },
+  menuItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  menuItemConfirm: {
+    backgroundColor: '#ef4444',
+  },
+  menuItemText: {
+    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  menuItemTextConfirm: {
+    color: '#fff',
+  },
+  // 2. Media Carousel (Zero Padding)
+  mediaWrapper: {
+    width: width,
+    height: width,
+    backgroundColor: '#f8fafc',
+  },
+  media: {
+    width: width,
+    height: width,
+  },
+  processingBox: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  processingTitle: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#94a3b8',
+    fontWeight: '500',
+  },
+  loadingBox: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorBox: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#94a3b8',
     fontSize: 12,
   },
-  emptyNotePlaceholder: {
-    color: '#9ca3af',
-    fontSize: 14,
-    fontStyle: 'italic',
-  },
-  footerInfo: {
-    alignItems: 'center',
+  // 3. Actions Row (Standard Padding: 16px)
+  actionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  freqActionBtn: {
-    borderRadius: 20,
+    alignItems: 'center',
     paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  controlsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 22,
+    padding: 4,
+  },
+  controlBtn: {
+    paddingHorizontal: 14,
     paddingVertical: 6,
   },
-  freqBtnText: {
-    color: '#4b5563',
+  controlBtnText: {
     fontSize: 12,
     fontWeight: '700',
+    color: '#64748b',
   },
-  frequencyBadge: {
-    alignItems: 'center',
+  intervalBadge: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    elevation: 2,
-    minWidth: 40,
     paddingHorizontal: 12,
     paddingVertical: 4,
+    borderRadius: 12,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 1,
   },
-  frequencyControlGroup: {
+  intervalText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  reviewBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#2563eb',
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
-    borderColor: '#e5e7eb',
-    borderRadius: 24,
-    borderWidth: 1,
-    flexDirection: 'row',
-    padding: 4,
+    elevation: 4,
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
-  frequencyValue: {
-    color: '#000',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  header: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 12,
-  },
-  headerTagText: {
-    color: '#3b82f6',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  historyCircle: {
+  reviewBtnSuccess: {
     backgroundColor: '#10b981',
     shadowColor: '#10b981',
   },
-  loadingPlaceholder: {
-    backgroundColor: '#eee',
+  reviewBtnLocked: {
+    backgroundColor: '#e2e8f0',
+    elevation: 0,
+    shadowOpacity: 0,
   },
-  media: {
-    alignItems: 'center',
-    height: width,
-    justifyContent: 'center',
-    width: width,
+  // 4. Caption Area (Bigger Padding: 30px)
+  captionArea: {
+    paddingHorizontal: 30, // Distinctly larger padding
+    paddingBottom: 24,
   },
-  mediaContainer: {
-    backgroundColor: '#fafafa',
-    height: width,
-    width: width,
+  postTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+    lineHeight: 24,
+    marginBottom: 6,
+    padding: 0,
+    margin: 0,
+  },
+  noteDisplay: {
+    minHeight: 20,
+    marginBottom: 12,
+  },
+  noteContent: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#334155',
+    padding: 0,
+    margin: 0,
+  },
+  inputReset: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  },
+  placeholderText: {
+    color: '#94a3b8',
+    fontStyle: 'italic',
+  },
+  editorContainer: {
+    marginBottom: 12,
   },
   noteInput: {
-    minHeight: 40,
-    paddingVertical: 8,
     textAlignVertical: 'top',
+    minHeight: 80,
   },
-  notePreview: {
-    minHeight: 40,
-    paddingVertical: 8,
+  originalCaptionSection: {
+    marginTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    paddingTop: 10,
   },
-  notes: {
-    color: '#4b5563',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  notesLabel: {
-    color: '#1a1a1a',
-    fontWeight: '700',
-  },
-  processingContainer: {
-    backgroundColor: '#f9fafb',
-  },
-  processingText: {
-    color: '#9ca3af',
-    fontSize: 14,
-    fontWeight: '500',
-    marginTop: 12,
-  },
-  repeatCircle: {
+  captionToggle: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#3b82f6',
-    borderRadius: 22,
-    elevation: 4,
-    height: 44,
-    justifyContent: 'center',
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    width: 44,
+    gap: 8,
+    paddingVertical: 6,
   },
-  tagDisplayList: {
+  captionToggleText: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  originalCaptionCard: {
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#cbd5e1',
+  },
+  originalCaptionText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#475569',
+    fontStyle: 'italic',
+  },
+  labelPillsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
   },
-  userSection: {
-    alignItems: 'center',
-    flexDirection: 'row',
+  pill: {
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 0.5,
+    borderColor: '#e2e8f0',
   },
-  username: {
-    fontSize: 14,
-    fontWeight: '700',
+  pillText: {
+    fontSize: 12,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  footerInfo: {
+    marginTop: 20,
+    alignItems: 'flex-end',
+  },
+  reviewTimeline: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontStyle: 'italic',
   },
 });

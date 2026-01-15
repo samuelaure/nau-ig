@@ -3,8 +3,9 @@ import {
     getPendingPosts,
     updatePostMedia,
     incrementSyncAttempts,
-    updateSyncStatus
+    updateSyncStatus,
 } from '@/repositories/PostRepository';
+import { runSql } from '../db';
 import { sendToMake } from './SyncService';
 
 /**
@@ -86,6 +87,10 @@ class SyncManager {
 
         try {
             this.isSyncing = true;
+
+            // Periodically clean up old trash (older than 30 days)
+            await runSql("DELETE FROM posts WHERE is_deleted = 1 AND deleted_at < datetime('now', '-30 days')");
+
             const webhookUrl = await getSetting('make_webhook_url');
 
             if (!webhookUrl) {
@@ -113,7 +118,12 @@ class SyncManager {
                 for (const p of pending) {
                     const result = response.results[p.id];
                     if (result?.status === 'success' && result.mediaData) {
-                        await updatePostMedia(p.id, result.mediaData);
+                        await updatePostMedia(p.id, {
+                            mediaData: result.mediaData,
+                            username: result.username,
+                            profile_image: result.profile_image,
+                            instagram_caption: result.instagram_caption,
+                        });
                         hasChanges = true;
                     } else {
                         await this.handleFailure(p, MAX_ATTEMPTS);

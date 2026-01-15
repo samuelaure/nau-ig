@@ -64,6 +64,11 @@ export const initDb = async (): Promise<void> => {
       tags TEXT,
       frequency TEXT,
       mediaData TEXT,
+      username TEXT,
+      profile_image TEXT,
+      instagram_caption TEXT,
+      is_deleted INTEGER DEFAULT 0,
+      deleted_at DATETIME,
       isProcessed INTEGER DEFAULT 0,
       sync_attempts INTEGER DEFAULT 0,
       sync_status TEXT DEFAULT 'pending',
@@ -75,13 +80,34 @@ export const initDb = async (): Promise<void> => {
     );
   `);
 
-  // Migration for existing databases
+  // Migration for existing databases: Check columns first to avoid noise
   try {
-    // Only attempt if not existing - catches errors silently to avoid dev red screen
-    await runSql('ALTER TABLE posts ADD COLUMN sync_attempts INTEGER DEFAULT 0').catch(() => { });
-    await runSql("ALTER TABLE posts ADD COLUMN sync_status TEXT DEFAULT 'pending'").catch(() => { });
+    const tableInfo = await executeSql<{ name: string }>('PRAGMA table_info(posts)');
+    const existingColumns = tableInfo.map((col) => col.name);
+
+    if (!existingColumns.includes('sync_attempts')) {
+      await runSql('ALTER TABLE posts ADD COLUMN sync_attempts INTEGER DEFAULT 0');
+    }
+    if (!existingColumns.includes('sync_status')) {
+      await runSql("ALTER TABLE posts ADD COLUMN sync_status TEXT DEFAULT 'pending'");
+    }
+    if (!existingColumns.includes('username')) {
+      await runSql('ALTER TABLE posts ADD COLUMN username TEXT');
+    }
+    if (!existingColumns.includes('profile_image')) {
+      await runSql('ALTER TABLE posts ADD COLUMN profile_image TEXT');
+    }
+    if (!existingColumns.includes('instagram_caption')) {
+      await runSql('ALTER TABLE posts ADD COLUMN instagram_caption TEXT');
+    }
+    if (!existingColumns.includes('is_deleted')) {
+      await runSql('ALTER TABLE posts ADD COLUMN is_deleted INTEGER DEFAULT 0');
+    }
+    if (!existingColumns.includes('deleted_at')) {
+      await runSql('ALTER TABLE posts ADD COLUMN deleted_at DATETIME');
+    }
   } catch (e) {
-    // Columns likely already exist
+    console.warn('[DB] Migration check failed:', e);
   }
 
   await runSql(`

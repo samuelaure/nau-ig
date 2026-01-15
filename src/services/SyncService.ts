@@ -3,6 +3,9 @@ import { MediaItem } from '@/repositories/PostRepository';
 interface SyncResult {
   status: 'success' | 'pending' | 'error';
   mediaData?: MediaItem[];
+  username?: string;
+  profile_image?: string;
+  instagram_caption?: string;
 }
 
 interface WebhookResponse {

@@ -16,14 +16,18 @@ export interface Post {
   isProcessed: number;
   sm2_interval: number;
   sm2_ease_factor: number;
-  sm2_repetition: number;
   frequency: string;
   sync_attempts: number;
   sync_status: 'pending' | 'processed' | 'standby';
+  username?: string;
+  profile_image?: string;
+  instagram_caption?: string;
+  is_deleted: number;
+  deleted_at?: string;
 }
 
 export const getDuePosts = async (tagFilter?: string | null): Promise<Post[]> => {
-  let query = `SELECT * FROM posts WHERE (next_review_at <= datetime('now') OR next_review_at IS NULL)`;
+  let query = `SELECT * FROM posts WHERE is_deleted = 0 AND (next_review_at <= datetime('now') OR next_review_at IS NULL)`;
   const params: any[] = [];
 
   if (tagFilter) {
@@ -36,7 +40,7 @@ export const getDuePosts = async (tagFilter?: string | null): Promise<Post[]> =>
 };
 
 export const getReviewedPosts = async (tagFilter?: string | null): Promise<Post[]> => {
-  let query = `SELECT * FROM posts WHERE next_review_at > datetime('now')`;
+  let query = `SELECT * FROM posts WHERE is_deleted = 0 AND next_review_at > datetime('now')`;
   const params: any[] = [];
 
   if (tagFilter) {
@@ -119,6 +123,10 @@ export const updatePostNote = async (id: number, content: string): Promise<void>
   await runSql('UPDATE posts SET content = ? WHERE id = ?', [content, id]);
 };
 
+export const updatePostTitle = async (id: number, title: string): Promise<void> => {
+  await runSql('UPDATE posts SET title = ? WHERE id = ?', [title, id]);
+};
+
 export const deletePost = async (id: number): Promise<void> => {
   await runSql('DELETE FROM posts WHERE id = ?', [id]);
 };
@@ -133,11 +141,52 @@ export const markPostAsReviewed = async (id: number, interval: number): Promise<
   );
 };
 
-export const updatePostMedia = async (id: number, mediaData: MediaItem[]): Promise<void> => {
+export const updatePostMedia = async (
+  id: number,
+  params: {
+    mediaData: MediaItem[];
+    username?: string;
+    profile_image?: string;
+    instagram_caption?: string;
+  },
+): Promise<void> => {
+  // First, get the current content to see if we should append/initialize with the caption
+  const posts = await executeSql<Post>('SELECT content FROM posts WHERE id = ?', [id]);
+  const currentPost = posts[0];
+  let newContent = currentPost?.content || '';
+
+  if (params.instagram_caption) {
+    if (!newContent) {
+      newContent = params.instagram_caption;
+    } else if (!newContent.includes(params.instagram_caption)) {
+      // Avoid double-appending if sync runs again
+      newContent = `\${newContent}\n\n\${params.instagram_caption}`;
+    }
+  }
+
   await runSql(
-    "UPDATE posts SET mediaData = ?, isProcessed = 1, sync_status = 'processed' WHERE id = ?",
-    [JSON.stringify(mediaData), id],
+    "UPDATE posts SET mediaData = ?, isProcessed = 1, sync_status = 'processed', username = ?, profile_image = ?, instagram_caption = ?, content = ? WHERE id = ?",
+    [
+      JSON.stringify(params.mediaData),
+      params.username || null,
+      params.profile_image || null,
+      params.instagram_caption || null,
+      newContent,
+      id,
+    ],
   );
+};
+
+export const moveToTrash = async (id: number): Promise<void> => {
+  await runSql("UPDATE posts SET is_deleted = 1, deleted_at = datetime('now') WHERE id = ?", [id]);
+};
+
+export const untrashPost = async (id: number): Promise<void> => {
+  await runSql('UPDATE posts SET is_deleted = 0, deleted_at = NULL WHERE id = ?', [id]);
+};
+
+export const getDeletedPosts = async (): Promise<Post[]> => {
+  return executeSql<Post>('SELECT * FROM posts WHERE is_deleted = 1 ORDER BY deleted_at DESC');
 };
 
 export const savePost = async (post: any): Promise<number> => {
