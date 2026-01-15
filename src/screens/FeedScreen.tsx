@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -15,15 +15,10 @@ import { SettingsModal } from '@/components/SettingsModal';
 import {
   getDuePosts,
   getReviewedPosts,
-  getPendingPosts,
   getAllTags,
-  updatePostMedia,
-  incrementSyncAttempts,
-  updateSyncStatus,
   Post,
 } from '@/repositories/PostRepository';
-import { getSetting } from '@/repositories/SettingsRepository';
-import { sendToMake } from '@/services/SyncService';
+import { syncManager } from '@/services/SyncManager';
 
 type FeedTab = 'due' | 'reviewed';
 
@@ -35,7 +30,6 @@ export const FeedScreen = () => {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const syncInterval = useRef<NodeJS.Timeout | null>(null);
 
   const loadFeed = useCallback(async () => {
     try {
@@ -50,70 +44,27 @@ export const FeedScreen = () => {
     }
   }, [activeTab, selectedTag]);
 
-  /**
-   * Optimized Background Sync:
-   * Batches all pending posts into a single request to the Make webhook.
-   */
-  const performBackgroundSync = useCallback(async () => {
-    const webhookUrl = await getSetting('make_webhook_url');
-    if (!webhookUrl) return;
-
-    // Only get posts that haven't hit the 10-attempt limit
-    const MAX_ATTEMPTS = 10;
-    const pending = await getPendingPosts(MAX_ATTEMPTS);
-
-    if (pending.length === 0) {
-      // No requests are made if no eligible captures exist
-      return;
-    }
-
-    console.log(`[Sync] Processing ${pending.length} pending captures...`);
-
-    try {
-      const response = await sendToMake(webhookUrl, {
-        action: 'sync_batch',
-        items: pending.map((p) => ({ id: p.id, url: p.instagramUrl })),
-      });
-
-      if (response.status === 'success' && response.results) {
-        let hasUpdates = false;
-        for (const p of pending) {
-          const result = response.results[p.id];
-
-          if (result?.status === 'success' && result.mediaData) {
-            await updatePostMedia(p.id, result.mediaData);
-            hasUpdates = true;
-          } else {
-            // If still pending or error, increment attempt counter
-            await incrementSyncAttempts(p.id);
-
-            // Check if it just hit the limit
-            if (p.sync_attempts + 1 >= MAX_ATTEMPTS) {
-              console.log(`[Sync] Post ${p.id} reached retry limit. Moving to Standby.`);
-              await updateSyncStatus(p.id, 'standby');
-            }
-          }
-        }
-        if (hasUpdates) loadFeed();
-      }
-    } catch (e) {
-      console.error('[Sync] Batch request failed:', e);
-      // Optional: increment all on catch, or wait for next interval
-    }
-  }, [loadFeed]);
-
   useEffect(() => {
     loadFeed();
-    // Poll every 10 seconds while the app is foregrounded
-    syncInterval.current = setInterval(performBackgroundSync, 10000);
+
+    // Start the centralized sync service (industry-standard background manager)
+    syncManager.start(15000);
+
+    // Subscribe to sync events to automatically refresh the feed when data arrives
+    const unsubscribe = syncManager.subscribe(() => {
+      loadFeed();
+    });
+
     return () => {
-      if (syncInterval.current) clearInterval(syncInterval.current);
+      unsubscribe();
+      syncManager.stop();
     };
-  }, [loadFeed, performBackgroundSync]);
+  }, [loadFeed]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await performBackgroundSync();
+    // Explicitly trigger a sync on pull-to-refresh
+    await syncManager.sync();
     await loadFeed();
     setRefreshing(false);
   };
