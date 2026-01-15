@@ -7,18 +7,18 @@ module.exports = {
     'plugin:react/recommended',
     'plugin:react-native/all',
     'plugin:@typescript-eslint/recommended',
-    'prettier'
+    'prettier',
   ],
   env: {
-    es6: true
+    es6: true,
   },
   settings: {
     react: {
-      version: 'detect'
-    }
+      version: 'detect',
+    },
   },
   rules: {
     'react-native/no-inline-styles': 'off',
-    'react/react-in-jsx-scope': 'off'
-  }
+    'react/react-in-jsx-scope': 'off',
+  },
 };
