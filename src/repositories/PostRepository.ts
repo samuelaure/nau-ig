@@ -190,16 +190,19 @@ export const getDeletedPosts = async (): Promise<Post[]> => {
 };
 
 export const savePost = async (post: any): Promise<number> => {
+  const isProcessed = post.instagramUrl ? 0 : 1;
   return runSql(
-    `INSERT INTO posts (instagramUrl, title, content, tags, frequency, sm2_interval, isProcessed, next_review_at) 
-     VALUES (?, ?, ?, ?, ?, 1, 0, ?)`,
+    `INSERT INTO posts (instagramUrl, title, content, tags, frequency, sm2_interval, isProcessed, next_review_at, sync_status) 
+     VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
     [
-      post.instagramUrl,
+      post.instagramUrl || null,
       post.title,
       post.content,
       JSON.stringify(post.tags),
       post.frequency,
+      isProcessed,
       post.startDate || new Date().toISOString().split('T')[0],
+      isProcessed ? 'processed' : 'pending',
     ],
   );
 };

@@ -36,11 +36,12 @@ import { COLORS } from '@/constants';
 interface CaptureModalProps {
   shareValue: string;
   onClose: () => void;
+  isShareIntent?: boolean;
 }
 
 const UNITS = ['Days', 'Weeks', 'Months', 'Years'];
 
-export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose }) => {
+export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose, isShareIntent }) => {
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -62,25 +63,25 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
   const [isFreqCustomized, setIsFreqCustomized] = useState(false);
 
   // Clean the URL if it comes with prefix text (common in Instagram shares)
-  const cleanUrl = useRef('');
-  useEffect(() => {
-    if (shareValue) {
-      // 1. Extract the actual URL from any surrounding text
-      const urlMatch = shareValue.match(/https?:\/\/[^\s]+/);
-      let extractedUrl = urlMatch ? urlMatch[0] : shareValue;
+  const [manualUrl, setManualUrl] = useState('');
+  const [finalUrl, setFinalUrl] = useState('');
 
-      // 2. Strip tracking parameters (the part after ?)
+  // Clean the URL if it comes with prefix text (common in Instagram shares)
+  useEffect(() => {
+    const rawUrl = shareValue || manualUrl;
+    if (rawUrl) {
+      const urlMatch = rawUrl.match(/https?:\/\/[^\s]+/);
+      let extractedUrl = urlMatch ? urlMatch[0] : rawUrl;
       try {
         const urlObj = new URL(extractedUrl);
-        // We only want the path (e.g. /p/CODE/) and host, not the query params
-        // This effectively removes ?igsh=... and other trackers
-        cleanUrl.current = `${urlObj.origin}${urlObj.pathname}`;
+        setFinalUrl(`${urlObj.origin}${urlObj.pathname}`);
       } catch (e) {
-        // Fallback if URL parsing fails: just use the extracted URL
-        cleanUrl.current = extractedUrl.split('?')[0];
+        setFinalUrl(extractedUrl.split('?')[0]);
       }
+    } else {
+      setFinalUrl('');
     }
-  }, [shareValue]);
+  }, [shareValue, manualUrl]);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -167,24 +168,22 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
       }),
     ]).start(() => {
       onClose();
-      if (Platform.OS === 'android') {
+      if (isShareIntent && Platform.OS === 'android') {
         BackHandler.exitApp();
       }
     });
   };
 
   const handleSave = async () => {
-    if (!shareValue) {
-      console.error('[CaptureModal] Cannot save: shareValue is missing');
+    if (!title && !note && !finalUrl) {
+      Alert.alert('Empty Content', 'Please add a title, note, or an Instagram URL.');
       return;
     }
 
-    console.log('[CaptureModal] handleSave started. shareValue:', cleanUrl.current);
-    setIsSaving(true);
     try {
       const postData = {
-        instagramUrl: cleanUrl.current,
-        title: title || 'Instagram Capture',
+        instagramUrl: finalUrl,
+        title: title || (finalUrl ? 'Instagram Capture' : 'New Note'),
         content: note,
         tags: selectedTags,
         frequency: `${repeatInterval} ${repeatUnit}`,
@@ -195,8 +194,10 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
       const postId = await savePost(postData);
       console.log('[CaptureModal] savePost success. postId:', postId);
 
-      // Wake up the background sync manager to start downloading the new capture
-      syncManager.triggerSync();
+      // Wake up the background sync manager to start downloading the new capture if there's a link
+      if (finalUrl) {
+        syncManager.triggerSync();
+      }
 
       console.log('[CaptureModal] Showing success toast');
       if (Platform.OS === 'android') {
@@ -214,249 +215,274 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.container}
+    <Modal
+      transparent
+      visible={true}
+      animationType="none"
+      onRequestClose={handleClose}
     >
-      <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={handleClose} activeOpacity={1} />
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.dialog,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.container}
       >
-        <View style={styles.urlHeader}>
-          <LinkIcon size={10} color="#9ca3af" />
-          <Text style={styles.urlText} numberOfLines={1}>
-            {cleanUrl.current.replace('https://', '').replace('www.', '') || 'No URL'}
-          </Text>
-        </View>
+        <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={handleClose} activeOpacity={1} />
+        </Animated.View>
 
-        <TextInput
-          style={styles.titleInput}
-          placeholder="Title"
-          placeholderTextColor="#9ca3af"
-          value={title}
-          onChangeText={setTitle}
-        />
-
-        <TextInput
-          style={styles.noteInput}
-          placeholder="Take a note..."
-          placeholderTextColor="#9ca3af"
-          multiline
-          value={note}
-          onChangeText={setNote}
-          autoFocus
-        />
-
-        <View style={styles.bottomRow}>
-          <View style={styles.actionsLeft}>
-            <TouchableOpacity style={styles.iconButton} onPress={() => setShowTagPicker(true)}>
-              <TagIcon size={20} color="#5f6368" />
-              {selectedTags.length > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{selectedTags.length}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.iconButton} onPress={() => setShowFreqPicker(true)}>
-              <RotateCw size={20} color="#5f6368" />
-              {isFreqCustomized && (
-                <View style={[styles.badge, { backgroundColor: COLORS.success }]}>
-                  <Check size={10} color="#fff" />
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
-            onPress={handleSave}
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.saveText}>Save</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {selectedTags.length > 0 && (
-          <View style={styles.tagPreviewContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {selectedTags.map((tag) => (
-                <View key={tag} style={styles.previewTag}>
-                  <Text style={styles.previewTagText}>{tag}</Text>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-      </Animated.View>
-
-      <Modal
-        visible={showTagPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowTagPicker(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowTagPicker(false)}
+        <Animated.View
+          style={[
+            styles.dialog,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
         >
-          <View style={styles.popupContent} onStartShouldSetResponder={() => true}>
-            <View style={styles.popupHeader}>
+          {!shareValue && (
+            <View style={styles.urlInputContainer}>
+              <LinkIcon size={18} color={COLORS.primary} style={styles.inputLinkIcon} />
               <TextInput
-                style={styles.popupInput}
-                placeholder="New label..."
-                value={newTag}
-                onChangeText={setNewTag}
+                style={styles.urlInput}
+                placeholder="Paste Instagram URL (optional)"
+                placeholderTextColor="#9ca3af"
+                value={manualUrl}
+                onChangeText={setManualUrl}
+                autoCapitalize="none"
+                autoCorrect={false}
               />
-              <TouchableOpacity onPress={addNewTag} style={styles.addTagBtn}>
-                <Plus size={20} color={COLORS.primary} />
+            </View>
+          )}
+
+          {shareValue && (
+            <View style={styles.urlHeader}>
+              <LinkIcon size={10} color="#9ca3af" />
+              <Text style={styles.urlText} numberOfLines={1}>
+                {finalUrl.replace('https://', '').replace('www.', '') || 'Processing Link...'}
+              </Text>
+            </View>
+          )}
+
+          <TextInput
+            style={styles.titleInput}
+            placeholder="Title"
+            placeholderTextColor="#9ca3af"
+            value={title}
+            onChangeText={setTitle}
+          />
+
+          <TextInput
+            style={styles.noteInput}
+            placeholder="Take a note..."
+            placeholderTextColor="#9ca3af"
+            multiline
+            value={note}
+            onChangeText={setNote}
+            autoFocus
+          />
+
+          <View style={styles.bottomRow}>
+            <View style={styles.actionsLeft}>
+              <TouchableOpacity style={styles.iconButton} onPress={() => setShowTagPicker(true)}>
+                <TagIcon size={20} color="#5f6368" />
+                {selectedTags.length > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{selectedTags.length}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.iconButton} onPress={() => setShowFreqPicker(true)}>
+                <RotateCw size={20} color="#5f6368" />
+                {isFreqCustomized && (
+                  <View style={[styles.badge, { backgroundColor: COLORS.success }]}>
+                    <Check size={10} color="#fff" />
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
-            <ScrollView style={styles.popupList}>
-              {filteredTags.map((tag) => {
-                const isSelected = selectedTags.includes(tag);
-                return (
-                  <TouchableOpacity
-                    key={tag}
-                    style={styles.popupItem}
-                    onPress={() => toggleTag(tag)}
-                  >
-                    {isSelected ? (
-                      <CheckSquare size={18} color={COLORS.primary} />
-                    ) : (
-                      <Square size={18} color="#5f6368" />
-                    )}
-                    <Text style={[styles.popupItemText, isSelected && styles.popupItemTextActive]}>
-                      {tag}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
 
-      <Modal
-        visible={showFreqPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setShowFreqPicker(false);
-          setShowUnitDropdown(false);
-        }}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => {
+            <TouchableOpacity
+              style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+              onPress={handleSave}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.saveText}>Save</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {selectedTags.length > 0 && (
+            <View style={styles.tagPreviewContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {selectedTags.map((tag) => (
+                  <View key={tag} style={styles.previewTag}>
+                    <Text style={styles.previewTagText}>{tag}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </Animated.View>
+        {/* Tag Picker Modal (Nested) */}
+        <Modal
+          visible={showTagPicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowTagPicker(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowTagPicker(false)}
+          >
+            <View style={styles.popupContent} onStartShouldSetResponder={() => true}>
+              <View style={styles.popupHeader}>
+                <TextInput
+                  style={styles.popupInput}
+                  placeholder="New label..."
+                  value={newTag}
+                  onChangeText={setNewTag}
+                />
+                <TouchableOpacity onPress={addNewTag} style={styles.addTagBtn}>
+                  <Plus size={20} color={COLORS.primary} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.popupList}>
+                {filteredTags.map((tag) => {
+                  const isSelected = selectedTags.includes(tag);
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      style={styles.popupItem}
+                      onPress={() => toggleTag(tag)}
+                    >
+                      {isSelected ? (
+                        <CheckSquare size={18} color={COLORS.primary} />
+                      ) : (
+                        <Square size={18} color="#5f6368" />
+                      )}
+                      <Text style={[styles.popupItemText, isSelected && styles.popupItemTextActive]}>
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Frequency Picker Modal (Nested) */}
+        <Modal
+          visible={showFreqPicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
             setShowFreqPicker(false);
             setShowUnitDropdown(false);
           }}
         >
-          <View style={styles.popupContent} onStartShouldSetResponder={() => true}>
-            <Text style={styles.popupTitle}>Repetition</Text>
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => {
+              setShowFreqPicker(false);
+              setShowUnitDropdown(false);
+            }}
+          >
+            <View style={styles.popupContent} onStartShouldSetResponder={() => true}>
+              <Text style={styles.popupTitle}>Repetition</Text>
 
-            <View style={styles.freqRow}>
-              <Text style={styles.freqLabel}>Every</Text>
-              <TextInput
-                style={styles.freqInput}
-                keyboardType="numeric"
-                value={repeatInterval}
-                onChangeText={setRepeatInterval}
-              />
-
-              <View style={styles.dropdownContainer}>
-                <TouchableOpacity
-                  style={styles.dropdownTrigger}
-                  onPress={() => setShowUnitDropdown(!showUnitDropdown)}
-                >
-                  <Text style={styles.dropdownValue}>{repeatUnit}</Text>
-                  <ChevronDown size={16} color="#5f6368" />
-                </TouchableOpacity>
-
-                {showUnitDropdown && (
-                  <View style={styles.dropdownList}>
-                    {UNITS.map((u) => (
-                      <TouchableOpacity
-                        key={u}
-                        style={styles.dropdownItem}
-                        onPress={() => {
-                          setRepeatUnit(u);
-                          setShowUnitDropdown(false);
-                        }}
-                      >
-                        <Text
-                          style={[
-                            styles.dropdownItemText,
-                            repeatUnit === u && styles.dropdownItemTextActive,
-                          ]}
-                        >
-                          {u}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-            </View>
-
-            <View style={styles.dateRow}>
-              <Text style={styles.freqLabel}>Starts</Text>
-              <View style={styles.dateInputWrapper}>
+              <View style={styles.freqRow}>
+                <Text style={styles.freqLabel}>Every</Text>
                 <TextInput
-                  style={styles.dateInput}
-                  value={startDate}
-                  onChangeText={onTypeDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#9ca3af"
+                  style={styles.freqInput}
+                  keyboardType="numeric"
+                  value={repeatInterval}
+                  onChangeText={setRepeatInterval}
                 />
-                <TouchableOpacity
-                  style={styles.calendarTrigger}
-                  onPress={() => setShowDatePicker(true)}
-                >
-                  <CalendarIcon size={18} color={COLORS.primary} />
-                </TouchableOpacity>
+
+                <View style={styles.dropdownContainer}>
+                  <TouchableOpacity
+                    style={styles.dropdownTrigger}
+                    onPress={() => setShowUnitDropdown(!showUnitDropdown)}
+                  >
+                    <Text style={styles.dropdownValue}>{repeatUnit}</Text>
+                    <ChevronDown size={16} color="#5f6368" />
+                  </TouchableOpacity>
+
+                  {showUnitDropdown && (
+                    <View style={styles.dropdownList}>
+                      {UNITS.map((u) => (
+                        <TouchableOpacity
+                          key={u}
+                          style={styles.dropdownItem}
+                          onPress={() => {
+                            setRepeatUnit(u);
+                            setShowUnitDropdown(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.dropdownItemText,
+                              repeatUnit === u && styles.dropdownItemTextActive,
+                            ]}
+                          >
+                            {u}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
               </View>
+
+              <View style={styles.dateRow}>
+                <Text style={styles.freqLabel}>Starts</Text>
+                <View style={styles.dateInputWrapper}>
+                  <TextInput
+                    style={styles.dateInput}
+                    value={startDate}
+                    onChangeText={onTypeDate}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#9ca3af"
+                  />
+                  <TouchableOpacity
+                    style={styles.calendarTrigger}
+                    onPress={() => setShowDatePicker(true)}
+                  >
+                    <CalendarIcon size={18} color={COLORS.primary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {showDatePicker && (
+                <DateTimePicker
+                  value={pickerDate}
+                  mode="date"
+                  display="default"
+                  onChange={handleDateChange}
+                />
+              )}
+
+              <TouchableOpacity
+                style={styles.doneBtn}
+                onPress={() => {
+                  setShowFreqPicker(false);
+                  setShowUnitDropdown(false);
+                  setIsFreqCustomized(true);
+                }}
+              >
+                <Text style={styles.doneBtnText}>Done</Text>
+              </TouchableOpacity>
             </View>
-
-            {showDatePicker && (
-              <DateTimePicker
-                value={pickerDate}
-                mode="date"
-                display="default"
-                onChange={handleDateChange}
-              />
-            )}
-
-            <TouchableOpacity
-              style={styles.doneBtn}
-              onPress={() => {
-                setShowFreqPicker(false);
-                setShowUnitDropdown(false);
-                setIsFreqCustomized(true);
-              }}
-            >
-              <Text style={styles.doneBtnText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-    </KeyboardAvoidingView>
+          </TouchableOpacity>
+        </Modal>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 };
 
@@ -500,6 +526,27 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 8,
     padding: 0,
+    marginTop: 10,
+  },
+  urlInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  urlInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1e293b',
+    paddingVertical: 10,
+    marginLeft: 8,
+  },
+  inputLinkIcon: {
+    opacity: 0.7,
   },
   noteInput: {
     color: '#3c4043',

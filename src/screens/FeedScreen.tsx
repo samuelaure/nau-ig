@@ -19,7 +19,8 @@ import {
   RotateCcw,
   Trash,
   Settings,
-  Tag as TagIcon
+  Tag as TagIcon,
+  Plus
 } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
@@ -29,6 +30,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { FeedItem } from '@/components/FeedItem';
 import { SettingsModal } from '@/components/SettingsModal';
+import { CaptureModal } from '@/components/CaptureModal';
 import {
   getDuePosts,
   getReviewedPosts,
@@ -53,6 +55,7 @@ export const FeedScreen = () => {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [viewableItems, setViewableItems] = useState<Set<number>>(new Set());
+  const [manualCaptureVisible, setManualCaptureVisible] = useState(false);
 
   // Animation values for Sidebar
   const sidebarOffset = useSharedValue(-width * 0.85);
@@ -306,6 +309,29 @@ export const FeedScreen = () => {
           loadFeed();
         }}
       />
+
+      {/* Manual Capture Modal */}
+      {manualCaptureVisible && (
+        <CaptureModal
+          shareValue=""
+          onClose={() => {
+            setManualCaptureVisible(false);
+            loadFeed();
+          }}
+          isShareIntent={false}
+        />
+      )}
+
+      {/* Floating Action Button */}
+      {activeTab === 'due' && (
+        <TouchableOpacity
+          style={[styles.fab, { bottom: insets.bottom + 20 }]}
+          onPress={() => setManualCaptureVisible(true)}
+          activeOpacity={0.8}
+        >
+          <Plus size={28} color="#fff" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -487,5 +513,21 @@ const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: '#fef2f2',
     borderRadius: 8,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#2563eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    zIndex: 999,
   },
 });

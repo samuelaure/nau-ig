@@ -27,7 +27,7 @@ const MainLayout = ({ isCapture }: { isCapture?: boolean }) => {
       <View style={styles.shareOverlay}>
         <StatusBar style="dark" />
         {hasShareIntent ? (
-          <CaptureModal shareValue={value || ''} onClose={resetShareIntent} />
+          <CaptureModal shareValue={value || ''} onClose={resetShareIntent} isShareIntent={true} />
         ) : (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={COLORS.primary} />
