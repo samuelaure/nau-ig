@@ -96,10 +96,15 @@ class SyncManager {
                             }))
                         );
 
+                        // Also cache the profile image locally
+                        const localProfileImage = result.profile_image
+                            ? await MediaCacheService.ensureMediaCached(result.profile_image)
+                            : undefined;
+
                         await updatePostMedia(post.id, {
                             mediaData: localMedia,
                             username: result.username,
-                            profile_image: result.profile_image,
+                            profile_image: localProfileImage,
                             instagram_caption: result.instagram_caption,
                         });
 

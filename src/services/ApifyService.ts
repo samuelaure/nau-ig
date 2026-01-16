@@ -71,7 +71,7 @@ export class ApifyService {
             return {
                 status: 'success',
                 username: item.ownerUsername,
-                profile_image: item.ownerProfilePicUrl,
+                profile_image: item.ownerProfilePicUrl || item.owner?.profile_pic_url,
                 instagram_caption: item.caption,
                 mediaItems,
             };
