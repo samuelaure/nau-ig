@@ -160,7 +160,7 @@ export const updatePostMedia = async (
       newContent = params.instagram_caption;
     } else if (!newContent.includes(params.instagram_caption)) {
       // Avoid double-appending if sync runs again
-      newContent = `\${newContent}\n\n\${params.instagram_caption}`;
+      newContent = `${newContent}\n\n${params.instagram_caption}`;
     }
   }
 

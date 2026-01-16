@@ -65,8 +65,20 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
   const cleanUrl = useRef('');
   useEffect(() => {
     if (shareValue) {
+      // 1. Extract the actual URL from any surrounding text
       const urlMatch = shareValue.match(/https?:\/\/[^\s]+/);
-      cleanUrl.current = urlMatch ? urlMatch[0] : shareValue;
+      let extractedUrl = urlMatch ? urlMatch[0] : shareValue;
+
+      // 2. Strip tracking parameters (the part after ?)
+      try {
+        const urlObj = new URL(extractedUrl);
+        // We only want the path (e.g. /p/CODE/) and host, not the query params
+        // This effectively removes ?igsh=... and other trackers
+        cleanUrl.current = `${urlObj.origin}${urlObj.pathname}`;
+      } catch (e) {
+        // Fallback if URL parsing fails: just use the extracted URL
+        cleanUrl.current = extractedUrl.split('?')[0];
+      }
     }
   }, [shareValue]);
 

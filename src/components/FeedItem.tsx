@@ -69,10 +69,14 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
   const noteInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    setTitleDraft(post.title || '');
-    setNoteDraft(post.content || '');
-    setDraftInterval(post.sm2_interval || 1);
-  }, [post.title, post.content, post.sm2_interval]);
+    // Only overwrite drafts if the user isn't currently editing.
+    // This prevents background sync refreshes from wiping out what the user is typing.
+    if (!isEditing) {
+      setTitleDraft(post.title || '');
+      setNoteDraft(post.content || '');
+      setDraftInterval(post.sm2_interval || 1);
+    }
+  }, [post.title, post.content, post.sm2_interval, isEditing]);
 
   useEffect(() => {
     if (post.isProcessed === 0) {
@@ -125,11 +129,19 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
 
   const handlePersist = useCallback(
     async () => {
+      let hasChanged = false;
       if (titleDraft !== post.title) {
         await updatePostTitle(post.id, titleDraft);
+        hasChanged = true;
       }
       if (noteDraft !== post.content) {
         await updatePostNote(post.id, noteDraft);
+        hasChanged = true;
+      }
+
+      if (hasChanged) {
+        // Refresh the parent so the 'post' prop eventually catches up
+        onProcessed();
       }
     },
     [post.id, post.title, post.content, titleDraft, noteDraft],
@@ -365,7 +377,7 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
           />
         ) : (
           <TouchableOpacity onPress={() => setIsEditing(true)}>
-            <Text style={styles.postTitle}>{post.title || 'Untitled Capture'}</Text>
+            <Text style={styles.postTitle}>{titleDraft || 'Untitled Capture'}</Text>
           </TouchableOpacity>
         )}
 
@@ -409,7 +421,7 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
             style={styles.noteDisplay}
           >
             <Text style={styles.noteContent}>
-              {post.content || <Text style={styles.placeholderText}>Tap to add a note or edit content...</Text>}
+              {noteDraft || <Text style={styles.placeholderText}>Tap to add a note or edit content...</Text>}
             </Text>
           </TouchableOpacity>
         )}
