@@ -1,4 +1,4 @@
-import { executeSql, runSql } from '../db';
+import { executeSql, runSql } from './core';
 
 interface Migration {
     version: number;
