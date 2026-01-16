@@ -16,7 +16,7 @@ import {
   TapGestureHandler,
   LongPressGestureHandler,
   State,
-  GestureHandlerRootView
+  GestureHandlerRootView,
 } from 'react-native-gesture-handler';
 import {
   Volume2,
@@ -29,7 +29,7 @@ import {
   EyeOff,
   ChevronUp,
   ChevronDown,
-  Check
+  Check,
 } from 'lucide-react-native';
 import { MediaCacheService } from '@/services/MediaCacheService';
 import {
@@ -112,7 +112,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
       if (post.tags) {
         try {
           setTags(JSON.parse(post.tags));
-        } catch (e) { }
+        } catch (e) {}
       }
 
       if (!post.mediaData || post.isProcessed === 0) {
@@ -141,25 +141,22 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
     prepareMedia();
   }, [post.mediaData, post.isProcessed, post.tags, pulseAnim]);
 
-  const handlePersist = useCallback(
-    async () => {
-      let hasChanged = false;
-      if (titleDraft !== post.title) {
-        await updatePostTitle(post.id, titleDraft);
-        hasChanged = true;
-      }
-      if (noteDraft !== post.content) {
-        await updatePostNote(post.id, noteDraft);
-        hasChanged = true;
-      }
+  const handlePersist = useCallback(async () => {
+    let hasChanged = false;
+    if (titleDraft !== post.title) {
+      await updatePostTitle(post.id, titleDraft);
+      hasChanged = true;
+    }
+    if (noteDraft !== post.content) {
+      await updatePostNote(post.id, noteDraft);
+      hasChanged = true;
+    }
 
-      if (hasChanged) {
-        // Refresh the parent so the 'post' prop eventually catches up
-        onProcessed();
-      }
-    },
-    [post.id, post.title, post.content, titleDraft, noteDraft],
-  );
+    if (hasChanged) {
+      // Refresh the parent so the 'post' prop eventually catches up
+      onProcessed();
+    }
+  }, [post.id, post.title, post.content, titleDraft, noteDraft]);
 
   // Debounced save while editing
   useEffect(() => {
@@ -177,10 +174,10 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
   const handleIntervalDraft = (direction: 'up' | 'down') => {
     if (direction === 'down') {
       // Study more often = interval gets smaller
-      setDraftInterval(prev => Math.max(1, Math.round(prev / 2)));
+      setDraftInterval((prev) => Math.max(1, Math.round(prev / 2)));
     } else {
       // Study less often = interval gets larger
-      setDraftInterval(prev => prev * 2);
+      setDraftInterval((prev) => prev * 2);
     }
   };
 
@@ -219,12 +216,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
   const renderMedia = ({ item }: { item: MediaItem }) => {
     const source = { uri: item.localUri || item.url };
     if (item.type === 'video') {
-      return (
-        <InstagramVideo
-          source={source}
-          isVisible={isVisible}
-        />
-      );
+      return <InstagramVideo source={source} isVisible={isVisible} />;
     }
     return (
       <View style={styles.mediaContainer}>
@@ -269,16 +261,10 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
         {menuVisible && (
           <View style={styles.dropdownMenu}>
             <TouchableOpacity
-              style={[
-                styles.menuItem,
-                isConfirmingDelete && styles.menuItemConfirm
-              ]}
+              style={[styles.menuItem, isConfirmingDelete && styles.menuItemConfirm]}
               onPress={handleDelete}
             >
-              <Text style={[
-                styles.menuItemText,
-                isConfirmingDelete && styles.menuItemTextConfirm
-              ]}>
+              <Text style={[styles.menuItemText, isConfirmingDelete && styles.menuItemTextConfirm]}>
                 {isConfirmingDelete ? 'Are you sure?' : 'Delete'}
               </Text>
             </TouchableOpacity>
@@ -295,7 +281,9 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
       >
         <View style={styles.mediaWrapper}>
           {post.isProcessed === 0 ? (
-            <Animated.View style={[styles.mediaPlaceholder, styles.processingBox, { opacity: pulseAnim }]}>
+            <Animated.View
+              style={[styles.mediaPlaceholder, styles.processingBox, { opacity: pulseAnim }]}
+            >
               <DownloadCloud size={40} color="#94a3b8" />
               <Text style={styles.processingTitle}>Syncing Media...</Text>
               <ActivityIndicator size="small" color="#94a3b8" style={{ marginTop: 12 }} />
@@ -436,9 +424,15 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
                   onPress={() => setShowOriginalCaption(!showOriginalCaption)}
                 >
                   <Text style={styles.captionToggleText}>
-                    {showOriginalCaption ? 'Hide Original Caption' : 'Show Original Caption (Reference)'}
+                    {showOriginalCaption
+                      ? 'Hide Original Caption'
+                      : 'Show Original Caption (Reference)'}
                   </Text>
-                  {showOriginalCaption ? <EyeOff size={14} color="#8e8e8e" /> : <Eye size={14} color="#8e8e8e" />}
+                  {showOriginalCaption ? (
+                    <EyeOff size={14} color="#8e8e8e" />
+                  ) : (
+                    <Eye size={14} color="#8e8e8e" />
+                  )}
                 </TouchableOpacity>
 
                 {showOriginalCaption && (
@@ -456,7 +450,9 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
             style={styles.noteDisplay}
           >
             <Text style={styles.noteContent}>
-              {noteDraft || <Text style={styles.placeholderText}>Tap to add a note or edit content...</Text>}
+              {noteDraft || (
+                <Text style={styles.placeholderText}>Tap to add a note or edit content...</Text>
+              )}
             </Text>
           </TouchableOpacity>
         )}
@@ -869,7 +865,10 @@ const InstagramVideo = ({ source, isVisible }: { source: any; isVisible?: boolea
     if (event.nativeEvent.state === State.ACTIVE) {
       setIsPaused(true);
       videoRef.current?.pauseAsync();
-    } else if (event.nativeEvent.state === State.END || event.nativeEvent.state === State.CANCELLED) {
+    } else if (
+      event.nativeEvent.state === State.END ||
+      event.nativeEvent.state === State.CANCELLED
+    ) {
       setIsPaused(false);
       if (isVisible) videoRef.current?.playAsync();
     }
@@ -878,7 +877,9 @@ const InstagramVideo = ({ source, isVisible }: { source: any; isVisible?: boolea
   return (
     <LongPressGestureHandler onHandlerStateChange={handleLongPress} minDurationMs={200}>
       <View style={styles.mediaContainer}>
-        <TapGestureHandler onHandlerStateChange={(e) => e.nativeEvent.state === State.ACTIVE && toggleMute()}>
+        <TapGestureHandler
+          onHandlerStateChange={(e) => e.nativeEvent.state === State.ACTIVE && toggleMute()}
+        >
           <View style={StyleSheet.absoluteFill}>
             <Video
               ref={videoRef}

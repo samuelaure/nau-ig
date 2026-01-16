@@ -20,7 +20,7 @@ import {
   Trash,
   Settings,
   Tag as TagIcon,
-  Plus
+  Plus,
 } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
@@ -66,7 +66,7 @@ export const FeedScreen = () => {
     setSidebarVisible(nextState);
     sidebarOffset.value = withSpring(nextState ? 0 : -width * 0.85, {
       damping: 20,
-      stiffness: 90
+      stiffness: 90,
     });
     overlayOpacity.value = withTiming(nextState ? 1 : 0, { duration: 300 });
   };
@@ -126,10 +126,14 @@ export const FeedScreen = () => {
 
   const getHeaderTitle = () => {
     switch (activeTab) {
-      case 'due': return 'To Review';
-      case 'reviewed': return 'History';
-      case 'trash': return 'Trash';
-      default: return '9naŭ IG';
+      case 'due':
+        return 'To Review';
+      case 'reviewed':
+        return 'History';
+      case 'trash':
+        return 'Trash';
+      default:
+        return '9naŭ IG';
     }
   };
 
@@ -174,7 +178,11 @@ export const FeedScreen = () => {
             onPress={() => handleTabChange('due')}
           >
             <LayoutGrid size={22} color={activeTab === 'due' ? '#2563eb' : '#4b5563'} />
-            <Text style={[styles.sidebarItemText, activeTab === 'due' && styles.sidebarItemTextActive]}>To Review</Text>
+            <Text
+              style={[styles.sidebarItemText, activeTab === 'due' && styles.sidebarItemTextActive]}
+            >
+              To Review
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -182,7 +190,14 @@ export const FeedScreen = () => {
             onPress={() => handleTabChange('reviewed')}
           >
             <Clock size={22} color={activeTab === 'reviewed' ? '#2563eb' : '#4b5563'} />
-            <Text style={[styles.sidebarItemText, activeTab === 'reviewed' && styles.sidebarItemTextActive]}>History</Text>
+            <Text
+              style={[
+                styles.sidebarItemText,
+                activeTab === 'reviewed' && styles.sidebarItemTextActive,
+              ]}
+            >
+              History
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -192,12 +207,22 @@ export const FeedScreen = () => {
             onPress={() => handleTabChange('trash')}
           >
             <Trash2 size={22} color={activeTab === 'trash' ? '#ef4444' : '#4b5563'} />
-            <Text style={[styles.sidebarItemText, activeTab === 'trash' && styles.sidebarItemTextActive]}>Trash</Text>
+            <Text
+              style={[
+                styles.sidebarItemText,
+                activeTab === 'trash' && styles.sidebarItemTextActive,
+              ]}
+            >
+              Trash
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.sidebarItem}
-            onPress={() => { setSettingsVisible(true); toggleSidebar(); }}
+            onPress={() => {
+              setSettingsVisible(true);
+              toggleSidebar();
+            }}
           >
             <Settings size={22} color="#4b5563" />
             <Text style={styles.sidebarItemText}>Settings</Text>
@@ -261,10 +286,16 @@ export const FeedScreen = () => {
                   <Text style={styles.trashDate}>Deleted on {item.deleted_at}</Text>
                 </View>
                 <View style={styles.trashActions}>
-                  <TouchableOpacity onPress={() => handleUntrash(item.id)} style={styles.untrashBtn}>
+                  <TouchableOpacity
+                    onPress={() => handleUntrash(item.id)}
+                    style={styles.untrashBtn}
+                  >
                     <RotateCcw size={20} color="#10b981" />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handlePermanentDelete(item.id)} style={styles.permaDeleteBtn}>
+                  <TouchableOpacity
+                    onPress={() => handlePermanentDelete(item.id)}
+                    style={styles.permaDeleteBtn}
+                  >
                     <Trash size={20} color="#ef4444" />
                   </TouchableOpacity>
                 </View>
@@ -286,8 +317,11 @@ export const FeedScreen = () => {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyText}>
-              {activeTab === 'due' ? 'You reached Review Zero!' :
-                activeTab === 'reviewed' ? 'No history yet.' : 'Trash is empty.'}
+              {activeTab === 'due'
+                ? 'You reached Review Zero!'
+                : activeTab === 'reviewed'
+                  ? 'No history yet.'
+                  : 'Trash is empty.'}
             </Text>
             <Text style={styles.emptySubText}>
               {activeTab === 'due'

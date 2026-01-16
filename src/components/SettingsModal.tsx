@@ -92,7 +92,7 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
 
       for (const p of standbyPosts) {
         try {
-          // We reset the status to pending and sync attempts to 0, 
+          // We reset the status to pending and sync attempts to 0,
           // then let the syncManager do its work or we call process directly.
           await resetSyncForManualRetry([p.id]);
           recovered++;
@@ -106,7 +106,7 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
 
       Alert.alert(
         'Recovery Triggered',
-        `${recovered} captures have been queued for processing. They will appear in the feed as they finish.`
+        `${recovered} captures have been queued for processing. They will appear in the feed as they finish.`,
       );
       loadStandbyCount();
     } catch (e: any) {
@@ -162,7 +162,8 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
                 <Trash2 size={16} color="#ef4444" style={{ marginLeft: 'auto' }} />
               </TouchableOpacity>
               <Text style={styles.helpText}>
-                Clearing the cache frees up local storage. Media is automatically re-downloaded when needed.
+                Clearing the cache frees up local storage. Media is automatically re-downloaded when
+                needed.
               </Text>
 
               {/* Sync Recovery */}
@@ -192,7 +193,7 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
               <Text style={styles.helpText}>
                 {standbyCount > 0
                   ? `There are ${standbyCount} captures in standby after failing to process. Tap to retry them.`
-                  : "All captures are processing normally or are fully synced."}
+                  : 'All captures are processing normally or are fully synced.'}
               </Text>
 
               <View style={styles.sectionDivider} />
@@ -343,5 +344,5 @@ const styles = StyleSheet.create({
   rotate: {
     // Note: React Native doesn't support rotation animation in styles alone easily without Animated.
     // For now, it will just stay static but we could add animation later if needed.
-  }
+  },
 });

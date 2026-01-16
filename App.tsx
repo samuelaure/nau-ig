@@ -14,7 +14,12 @@ const MainLayout = ({ isCapture }: { isCapture?: boolean }) => {
 
   useEffect(() => {
     if (isCapture) {
-      console.log('[MainLayout] Running in Capture Mode. hasIntent:', hasShareIntent, 'value:', value);
+      console.log(
+        '[MainLayout] Running in Capture Mode. hasIntent:',
+        hasShareIntent,
+        'value:',
+        value,
+      );
     }
   }, [isCapture, hasShareIntent, value]);
 
@@ -35,7 +40,9 @@ const MainLayout = ({ isCapture }: { isCapture?: boolean }) => {
             {/* Fail-safe button for debugging */}
             <TouchableOpacity
               style={{ marginTop: 20, padding: 10, backgroundColor: '#eee', borderRadius: 8 }}
-              onPress={() => console.log('Current state - hasIntent:', hasShareIntent, 'value:', value)}
+              onPress={() =>
+                console.log('Current state - hasIntent:', hasShareIntent, 'value:', value)
+              }
             >
               <Text style={{ color: '#666' }}>Log State</Text>
             </TouchableOpacity>

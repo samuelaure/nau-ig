@@ -41,7 +41,11 @@ interface CaptureModalProps {
 
 const UNITS = ['Days', 'Weeks', 'Months', 'Years'];
 
-export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose, isShareIntent }) => {
+export const CaptureModal: React.FC<CaptureModalProps> = ({
+  shareValue,
+  onClose,
+  isShareIntent,
+}) => {
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -120,7 +124,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose,
     const tag = newTag.trim();
     if (tag) {
       // Find case-insensitive match
-      const existing = existingTags.find(t => t.toLowerCase() === tag.toLowerCase());
+      const existing = existingTags.find((t) => t.toLowerCase() === tag.toLowerCase());
       const tagToUse = existing || tag;
 
       if (!existing) {
@@ -134,9 +138,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose,
     }
   };
 
-  const filteredTags = existingTags.filter(t =>
-    t.toLowerCase().includes(newTag.toLowerCase())
-  );
+  const filteredTags = existingTags.filter((t) => t.toLowerCase().includes(newTag.toLowerCase()));
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
@@ -215,18 +217,17 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose,
   };
 
   return (
-    <Modal
-      transparent
-      visible={true}
-      animationType="none"
-      onRequestClose={handleClose}
-    >
+    <Modal transparent visible={true} animationType="none" onRequestClose={handleClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}
       >
         <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={handleClose} activeOpacity={1} />
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            onPress={handleClose}
+            activeOpacity={1}
+          />
         </Animated.View>
 
         <Animated.View
@@ -364,7 +365,9 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose,
                       ) : (
                         <Square size={18} color="#5f6368" />
                       )}
-                      <Text style={[styles.popupItemText, isSelected && styles.popupItemTextActive]}>
+                      <Text
+                        style={[styles.popupItemText, isSelected && styles.popupItemTextActive]}
+                      >
                         {tag}
                       </Text>
                     </TouchableOpacity>

@@ -103,7 +103,9 @@ export const resetSyncForManualRetry = async (ids: number[]): Promise<void> => {
 };
 
 export const getStandbyPosts = async (): Promise<Post[]> => {
-  return executeSql<Post>("SELECT * FROM posts WHERE sync_status = 'standby' OR sync_attempts >= 10");
+  return executeSql<Post>(
+    "SELECT * FROM posts WHERE sync_status = 'standby' OR sync_attempts >= 10",
+  );
 };
 
 export const updatePostFrequency = async (
