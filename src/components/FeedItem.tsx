@@ -71,6 +71,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
   const [menuVisible, setMenuVisible] = useState(false);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [mediaAspectRatio, setMediaAspectRatio] = useState(1);
 
   const isSimpleNote = !post.instagramUrl;
 
@@ -136,6 +137,13 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
           }),
         );
         setMedia(cachedData);
+
+        // Try to get aspect ratio for the first item if it's an image
+        if (cachedData.length > 0 && cachedData[0].type === 'image') {
+          Image.getSize(cachedData[0].localUri || cachedData[0].url, (w, h) => {
+            if (w && h) setMediaAspectRatio(w / h);
+          });
+        }
       } catch (e) {
         console.error('JSON Parse error for post media', e);
       } finally {
@@ -222,11 +230,21 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
   const renderMedia = ({ item }: { item: MediaItem }) => {
     const source = { uri: item.localUri || item.url };
     if (item.type === 'video') {
-      return <InstagramVideo source={source} isVisible={isVisible} />;
+      return (
+        <InstagramVideo
+          source={source}
+          isVisible={isVisible}
+          onAspectRatio={(ratio) => {
+            // Only set aspect ratio if it hasn't been set or if it's significantly different
+            if (mediaAspectRatio === 1) setMediaAspectRatio(ratio);
+          }}
+          aspectRatio={mediaAspectRatio}
+        />
+      );
     }
     return (
-      <View style={styles.mediaContainer}>
-        <Image source={source} style={styles.media} resizeMode="contain" />
+      <View style={[styles.mediaContainer, { aspectRatio: mediaAspectRatio }]}>
+        <Image source={source} style={styles.media} resizeMode="cover" />
       </View>
     );
   };
@@ -319,6 +337,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
                 <FlatList
                   data={media}
                   renderItem={renderMedia}
+                  style={{ aspectRatio: mediaAspectRatio }}
                   horizontal
                   pagingEnabled
                   showsHorizontalScrollIndicator={false}
@@ -511,10 +530,9 @@ const styles = StyleSheet.create({
   },
   mediaContainer: {
     width: width,
-    // Flexible height: we use a base aspect ratio but allow content to define height
-    minHeight: width,
     justifyContent: 'center',
     backgroundColor: '#000',
+    overflow: 'hidden',
   },
   media: {
     width: '100%',
@@ -881,7 +899,17 @@ const styles = StyleSheet.create({
 });
 // --- Instagram Video Component ---
 
-const InstagramVideo = ({ source, isVisible }: { source: any; isVisible?: boolean }) => {
+const InstagramVideo = ({
+  source,
+  isVisible,
+  onAspectRatio,
+  aspectRatio = 1,
+}: {
+  source: any;
+  isVisible?: boolean;
+  onAspectRatio?: (ratio: number) => void;
+  aspectRatio?: number;
+}) => {
   const videoRef = useRef<Video>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
@@ -922,7 +950,7 @@ const InstagramVideo = ({ source, isVisible }: { source: any; isVisible?: boolea
 
   return (
     <LongPressGestureHandler onHandlerStateChange={handleLongPress} minDurationMs={200}>
-      <View style={styles.mediaContainer}>
+      <View style={[styles.mediaContainer, { aspectRatio }]}>
         <TapGestureHandler
           onHandlerStateChange={(e) => e.nativeEvent.state === State.ACTIVE && toggleMute()}
         >
@@ -931,10 +959,16 @@ const InstagramVideo = ({ source, isVisible }: { source: any; isVisible?: boolea
               ref={videoRef}
               style={styles.media}
               source={source}
-              resizeMode={ResizeMode.CONTAIN} // Switch to contain to see full 9:16 Reels
+              resizeMode={ResizeMode.COVER}
               isLooping
               isMuted={isMuted}
               shouldPlay={isVisible && !isPaused}
+              onReadyForDisplay={(event) => {
+                if (onAspectRatio) {
+                  const ratio = event.naturalSize.width / event.naturalSize.height;
+                  onAspectRatio(ratio);
+                }
+              }}
             />
 
             {/* Hold to Pause Indicator */}
