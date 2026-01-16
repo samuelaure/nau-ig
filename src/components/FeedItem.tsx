@@ -112,7 +112,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
       if (post.tags) {
         try {
           setTags(JSON.parse(post.tags));
-        } catch (e) {}
+        } catch (e) { }
       }
 
       if (!post.mediaData || post.isProcessed === 0) {
@@ -201,6 +201,8 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
     }
     try {
       await moveToTrash(post.id);
+      setIsConfirmingDelete(false);
+      setMenuVisible(false);
       onProcessed();
     } catch (e) {
       console.error('Failed to delete post', e);

@@ -58,7 +58,7 @@ export const initDb = async (): Promise<void> => {
   await runSql(`
     CREATE TABLE IF NOT EXISTS posts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      instagramUrl TEXT NOT NULL,
+      instagramUrl TEXT,
       title TEXT,
       content TEXT,
       tags TEXT,

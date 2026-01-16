@@ -153,7 +153,7 @@ export const FeedScreen = () => {
   }).current;
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 60, // Item is "visible" if 60% is on screen
+    itemVisiblePercentThreshold: 40, // Item is "visible" if 40% is on screen
   }).current;
 
   return (

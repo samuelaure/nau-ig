@@ -97,7 +97,7 @@ export const resetSyncForManualRetry = async (ids: number[]): Promise<void> => {
   if (ids.length === 0) return;
   const placeholders = ids.map(() => '?').join(',');
   await runSql(
-    `UPDATE posts SET sync_attempts = 0, sync_status = 'pending' WHERE id IN (\${placeholders})`,
+    `UPDATE posts SET sync_attempts = 0, sync_status = 'pending' WHERE id IN (${placeholders})`,
     ids,
   );
 };
@@ -197,7 +197,7 @@ export const savePost = async (post: any): Promise<number> => {
     `INSERT INTO posts (instagramUrl, title, content, tags, frequency, sm2_interval, isProcessed, next_review_at, sync_status) 
      VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
     [
-      post.instagramUrl || null,
+      post.instagramUrl || '',
       post.title,
       post.content,
       JSON.stringify(post.tags),
