@@ -30,6 +30,7 @@ import {
   ChevronUp,
   ChevronDown,
   Check,
+  StickyNote,
 } from 'lucide-react-native';
 import { MediaCacheService } from '@/services/MediaCacheService';
 import {
@@ -69,6 +70,8 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
   const [menuVisible, setMenuVisible] = useState(false);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+
+  const isSimpleNote = !post.instagramUrl;
 
   const doubleTapRef = useRef(null);
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -240,15 +243,24 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
 
   return (
     <View style={styles.container}>
-      {/* 1. Instagram-like Header (16px Padding) */}
-      <View style={styles.igHeader}>
+      {/* 1. Header (Dynamic Based on Content Type) */}
+      <View style={[styles.igHeader, isSimpleNote && styles.noteHeader]}>
         <View style={styles.igUserInfo}>
-          <View style={styles.igAvatarPlaceholder}>
-            {post.profile_image ? (
-              <Image source={{ uri: post.profile_image }} style={styles.igAvatar} />
-            ) : null}
-          </View>
-          <Text style={styles.igUsername}>{post.username || 'instagram_user'}</Text>
+          {isSimpleNote ? (
+            <View style={styles.noteIconWrapper}>
+              <StickyNote size={18} color="#2563eb" />
+              <Text style={styles.noteBadgeText}>Note</Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.igAvatarPlaceholder}>
+                {post.profile_image ? (
+                  <Image source={{ uri: post.profile_image }} style={styles.igAvatar} />
+                ) : null}
+              </View>
+              <Text style={styles.igUsername}>{post.username || 'instagram_user'}</Text>
+            </>
+          )}
         </View>
         <TouchableOpacity
           style={styles.menuTrigger}
@@ -274,63 +286,65 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
         )}
       </View>
 
-      {/* 2. Media Carousel (0px Padding) */}
-      <TapGestureHandler
-        onHandlerStateChange={onDoubleTap}
-        numberOfTaps={2}
-        ref={doubleTapRef}
-        enabled={post.isProcessed === 1}
-      >
-        <View style={styles.mediaWrapper}>
-          {post.isProcessed === 0 ? (
-            <Animated.View
-              style={[styles.mediaPlaceholder, styles.processingBox, { opacity: pulseAnim }]}
-            >
-              <DownloadCloud size={40} color="#94a3b8" />
-              <Text style={styles.processingTitle}>Syncing Media...</Text>
-              <ActivityIndicator size="small" color="#94a3b8" style={{ marginTop: 12 }} />
-            </Animated.View>
-          ) : loading ? (
-            <View style={[styles.mediaPlaceholder, styles.loadingBox]}>
-              <ActivityIndicator color="#000" />
-            </View>
-          ) : media.length > 0 ? (
-            <View>
-              <FlatList
-                data={media}
-                renderItem={renderMedia}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                keyExtractor={(_, index) => index.toString()}
-                decelerationRate="fast"
-                snapToInterval={width}
-                onScroll={(e) => {
-                  const offset = e.nativeEvent.contentOffset.x;
-                  setActiveMediaIndex(Math.round(offset / width));
-                }}
-              />
-              {media.length > 1 && (
-                <View style={styles.paginationContainer}>
-                  {media.map((_, i) => (
-                    <View
-                      key={i}
-                      style={[
-                        styles.paginationDot,
-                        i === activeMediaIndex && styles.paginationDotActive,
-                      ]}
-                    />
-                  ))}
-                </View>
-              )}
-            </View>
-          ) : (
-            <View style={[styles.mediaPlaceholder, styles.errorBox]}>
-              <Text style={styles.errorText}>Media not available</Text>
-            </View>
-          )}
-        </View>
-      </TapGestureHandler>
+      {/* 2. Media Carousel (Only for IG links) */}
+      {!isSimpleNote && (
+        <TapGestureHandler
+          onHandlerStateChange={onDoubleTap}
+          numberOfTaps={2}
+          ref={doubleTapRef}
+          enabled={post.isProcessed === 1}
+        >
+          <View style={styles.mediaWrapper}>
+            {post.isProcessed === 0 ? (
+              <Animated.View
+                style={[styles.mediaPlaceholder, styles.processingBox, { opacity: pulseAnim }]}
+              >
+                <DownloadCloud size={40} color="#94a3b8" />
+                <Text style={styles.processingTitle}>Syncing Media...</Text>
+                <ActivityIndicator size="small" color="#94a3b8" style={{ marginTop: 12 }} />
+              </Animated.View>
+            ) : loading ? (
+              <View style={[styles.mediaPlaceholder, styles.loadingBox]}>
+                <ActivityIndicator color="#000" />
+              </View>
+            ) : media.length > 0 ? (
+              <View>
+                <FlatList
+                  data={media}
+                  renderItem={renderMedia}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  keyExtractor={(_, index) => index.toString()}
+                  decelerationRate="fast"
+                  snapToInterval={width}
+                  onScroll={(e) => {
+                    const offset = e.nativeEvent.contentOffset.x;
+                    setActiveMediaIndex(Math.round(offset / width));
+                  }}
+                />
+                {media.length > 1 && (
+                  <View style={styles.paginationContainer}>
+                    {media.map((_, i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.paginationDot,
+                          i === activeMediaIndex && styles.paginationDotActive,
+                        ]}
+                      />
+                    ))}
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View style={[styles.mediaPlaceholder, styles.errorBox]}>
+                <Text style={styles.errorText}>Media not available</Text>
+              </View>
+            )}
+          </View>
+        </TapGestureHandler>
+      )}
 
       {/* 3. Refactored Review Bar (16px Padding) */}
       {/* Structure: Done | Current frequency | Less | More */}
@@ -339,10 +353,10 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
           style={[
             styles.doneBtn,
             isHistory && styles.doneBtnSuccess,
-            post.isProcessed === 0 && styles.doneBtnLocked,
+            (post.isProcessed === 0 || (isSimpleNote && isHistory)) && styles.doneBtnLocked,
           ]}
           onPress={handleReviewed}
-          disabled={isUpdating || isHistory || post.isProcessed === 0}
+          disabled={isUpdating || isHistory || (post.isProcessed === 0 && !isSimpleNote)}
         >
           {isUpdating ? (
             <ActivityIndicator size="small" color="#fff" />
@@ -505,6 +519,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   // 1. IG Header (16px)
+  noteHeader: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    backgroundColor: '#f8fafc',
+  },
+  noteIconWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  noteBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2563eb',
+    marginLeft: 6,
+    textTransform: 'uppercase',
+  },
+  noteDisplay: {
+    paddingVertical: 12,
+    minHeight: 120,
+    backgroundColor: '#fff',
+  },
   igHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -748,10 +787,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     padding: 0,
     margin: 0,
-  },
-  noteDisplay: {
-    minHeight: 20,
-    marginBottom: 12,
   },
   noteContent: {
     fontSize: 15,
