@@ -116,7 +116,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
       if (post.tags) {
         try {
           setTags(JSON.parse(post.tags));
-        } catch (e) { }
+        } catch (e) {}
       }
 
       if (!post.mediaData || post.isProcessed === 0) {
@@ -256,7 +256,11 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
             <>
               <View style={styles.igAvatarPlaceholder}>
                 {post.profile_image ? (
-                  <Image key={post.profile_image} source={{ uri: post.profile_image }} style={styles.igAvatar} />
+                  <Image
+                    key={post.profile_image}
+                    source={{ uri: post.profile_image }}
+                    style={styles.igAvatar}
+                  />
                 ) : (
                   <User size={18} color="#94a3b8" />
                 )}
