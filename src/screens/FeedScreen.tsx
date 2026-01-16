@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -52,6 +52,7 @@ export const FeedScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [viewableItems, setViewableItems] = useState<Set<number>>(new Set());
 
   // Animation values for Sidebar
   const sidebarOffset = useSharedValue(-width * 0.85);
@@ -138,6 +139,15 @@ export const FeedScreen = () => {
     opacity: overlayOpacity.value,
     display: overlayOpacity.value === 0 ? 'none' : 'flex',
   }));
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    const ids = new Set<number>(viewableItems.map((item: any) => item.item.id));
+    setViewableItems(ids);
+  }).current;
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 60, // Item is "visible" if 60% is on screen
+  }).current;
 
   return (
     <View style={styles.container}>
@@ -258,9 +268,18 @@ export const FeedScreen = () => {
               </View>
             );
           }
-          return <FeedItem post={item} onProcessed={loadFeed} isHistory={activeTab === 'reviewed'} />;
+          return (
+            <FeedItem
+              post={item}
+              onProcessed={loadFeed}
+              isHistory={activeTab === 'reviewed'}
+              isVisible={viewableItems.has(item.id)}
+            />
+          );
         }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyText}>

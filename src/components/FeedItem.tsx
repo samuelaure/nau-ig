@@ -13,6 +13,15 @@ import {
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import {
+  TapGestureHandler,
+  LongPressGestureHandler,
+  State,
+  GestureHandlerRootView
+} from 'react-native-gesture-handler';
+import {
+  Volume2,
+  VolumeX,
+  Play,
   MoreHorizontal,
   CheckCircle2,
   DownloadCloud,
@@ -22,7 +31,6 @@ import {
   ChevronDown,
   Check
 } from 'lucide-react-native';
-import { TapGestureHandler, State } from 'react-native-gesture-handler';
 import { MediaCacheService } from '@/services/MediaCacheService';
 import {
   Post,
@@ -39,9 +47,10 @@ interface FeedItemProps {
   post: Post;
   onProcessed: () => void;
   isHistory?: boolean;
+  isVisible?: boolean;
 }
 
-export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
+export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemProps) => {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +67,7 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
 
   // Menu State
   const [menuVisible, setMenuVisible] = useState(false);
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   const doubleTapRef = useRef(null);
@@ -111,11 +121,15 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
       }
       try {
         const data: MediaItem[] = JSON.parse(post.mediaData);
+        // Pre-fetch all media to get dimensions or ensure local availability
         const cachedData = await Promise.all(
-          data.map(async (item) => ({
-            ...item,
-            localUri: await MediaCacheService.ensureMediaCached(item.url),
-          })),
+          data.map(async (item) => {
+            const localUri = await MediaCacheService.ensureMediaCached(item.url);
+            return {
+              ...item,
+              localUri,
+            };
+          }),
         );
         setMedia(cachedData);
       } catch (e) {
@@ -206,17 +220,17 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
     const source = { uri: item.localUri || item.url };
     if (item.type === 'video') {
       return (
-        <Video
-          style={styles.media}
+        <InstagramVideo
           source={source}
-          useNativeControls
-          resizeMode={ResizeMode.COVER}
-          isLooping
-          shouldPlay={false}
+          isVisible={isVisible}
         />
       );
     }
-    return <Image source={source} style={styles.media} resizeMode="cover" />;
+    return (
+      <View style={styles.mediaContainer}>
+        <Image source={source} style={styles.media} resizeMode="contain" />
+      </View>
+    );
   };
 
   const onBlurWrapper = () => {
@@ -281,26 +295,47 @@ export const FeedItem = ({ post, onProcessed, isHistory }: FeedItemProps) => {
       >
         <View style={styles.mediaWrapper}>
           {post.isProcessed === 0 ? (
-            <Animated.View style={[styles.media, styles.processingBox, { opacity: pulseAnim }]}>
+            <Animated.View style={[styles.mediaPlaceholder, styles.processingBox, { opacity: pulseAnim }]}>
               <DownloadCloud size={40} color="#94a3b8" />
               <Text style={styles.processingTitle}>Syncing Media...</Text>
               <ActivityIndicator size="small" color="#94a3b8" style={{ marginTop: 12 }} />
             </Animated.View>
           ) : loading ? (
-            <View style={[styles.media, styles.loadingBox]}>
+            <View style={[styles.mediaPlaceholder, styles.loadingBox]}>
               <ActivityIndicator color="#000" />
             </View>
           ) : media.length > 0 ? (
-            <FlatList
-              data={media}
-              renderItem={renderMedia}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(_, index) => index.toString()}
-            />
+            <View>
+              <FlatList
+                data={media}
+                renderItem={renderMedia}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(_, index) => index.toString()}
+                decelerationRate="fast"
+                snapToInterval={width}
+                onScroll={(e) => {
+                  const offset = e.nativeEvent.contentOffset.x;
+                  setActiveMediaIndex(Math.round(offset / width));
+                }}
+              />
+              {media.length > 1 && (
+                <View style={styles.paginationContainer}>
+                  {media.map((_, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.paginationDot,
+                        i === activeMediaIndex && styles.paginationDotActive,
+                      ]}
+                    />
+                  ))}
+                </View>
+              )}
+            </View>
           ) : (
-            <View style={[styles.media, styles.errorBox]}>
+            <View style={[styles.mediaPlaceholder, styles.errorBox]}>
               <Text style={styles.errorText}>Media not available</Text>
             </View>
           )}
@@ -451,6 +486,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginBottom: 24,
   },
+  mediaWrapper: {
+    width: width,
+    backgroundColor: '#000',
+  },
+  mediaContainer: {
+    width: width,
+    // Flexible height: we use a base aspect ratio but allow content to define height
+    minHeight: width,
+    justifyContent: 'center',
+    backgroundColor: '#000',
+  },
+  media: {
+    width: '100%',
+    height: '100%',
+  },
+  mediaPlaceholder: {
+    width: width,
+    aspectRatio: 1, // Placeholders remain square
+    backgroundColor: '#f8fafc',
+  },
   // 1. IG Header (16px)
   igHeader: {
     flexDirection: 'row',
@@ -519,15 +574,6 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   // 2. Media Carousel (0px)
-  mediaWrapper: {
-    width: width,
-    height: width,
-    backgroundColor: '#f8fafc',
-  },
-  media: {
-    width: width,
-    height: width,
-  },
   processingBox: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -549,6 +595,50 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#94a3b8',
     fontSize: 12,
+  },
+  // --- Video Overlays ---
+  videoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pauseIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  muteIndicator: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  paginationContainer: {
+    position: 'absolute',
+    bottom: -20, // Move dots slightly below the media like modern IG
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  paginationDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#cbd5e1',
+  },
+  paginationDotActive: {
+    backgroundColor: '#2563eb',
+    width: 8, // Slightly larger active dot
   },
   // --- 3. Review Bar (16px) ---
   reviewBar: {
@@ -747,3 +837,77 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 });
+// --- Instagram Video Component ---
+
+const InstagramVideo = ({ source, isVisible }: { source: any; isVisible?: boolean }) => {
+  const videoRef = useRef<Video>(null);
+  const [isMuted, setIsMuted] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
+  const [showMuteIndicator, setShowMuteIndicator] = useState(false);
+  const muteAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!isVisible) {
+      videoRef.current?.pauseAsync();
+    } else if (!isPaused) {
+      videoRef.current?.playAsync();
+    }
+  }, [isVisible, isPaused]);
+
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+    setShowMuteIndicator(true);
+    muteAnim.setValue(1);
+    Animated.timing(muteAnim, {
+      toValue: 0,
+      duration: 1000,
+      useNativeDriver: true,
+    }).start(() => setShowMuteIndicator(false));
+  };
+
+  const handleLongPress = (event: any) => {
+    if (event.nativeEvent.state === State.ACTIVE) {
+      setIsPaused(true);
+      videoRef.current?.pauseAsync();
+    } else if (event.nativeEvent.state === State.END || event.nativeEvent.state === State.CANCELLED) {
+      setIsPaused(false);
+      if (isVisible) videoRef.current?.playAsync();
+    }
+  };
+
+  return (
+    <LongPressGestureHandler onHandlerStateChange={handleLongPress} minDurationMs={200}>
+      <View style={styles.mediaContainer}>
+        <TapGestureHandler onHandlerStateChange={(e) => e.nativeEvent.state === State.ACTIVE && toggleMute()}>
+          <View style={StyleSheet.absoluteFill}>
+            <Video
+              ref={videoRef}
+              style={styles.media}
+              source={source}
+              resizeMode={ResizeMode.CONTAIN} // Switch to contain to see full 9:16 Reels
+              isLooping
+              isMuted={isMuted}
+              shouldPlay={isVisible && !isPaused}
+            />
+
+            {/* Hold to Pause Indicator */}
+            {isPaused && (
+              <View style={styles.videoOverlay}>
+                <View style={styles.pauseIconContainer}>
+                  <Play size={40} color="#fff" fill="#fff" style={{ marginLeft: 4 }} />
+                </View>
+              </View>
+            )}
+
+            {/* Mute/Unmute Indicator */}
+            {showMuteIndicator && (
+              <Animated.View style={[styles.muteIndicator, { opacity: muteAnim }]}>
+                {isMuted ? <VolumeX size={24} color="#fff" /> : <Volume2 size={24} color="#fff" />}
+              </Animated.View>
+            )}
+          </View>
+        </TapGestureHandler>
+      </View>
+    </LongPressGestureHandler>
+  );
+};
