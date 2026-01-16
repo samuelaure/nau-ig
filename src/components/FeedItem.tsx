@@ -42,6 +42,7 @@ import {
   updatePostTitle,
   moveToTrash,
 } from '@/repositories/PostRepository';
+import { COLORS } from '@/constants';
 
 const { width } = Dimensions.get('window');
 
@@ -701,8 +702,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#cbd5e1',
   },
   paginationDotActive: {
-    backgroundColor: '#2563eb',
-    width: 8, // Slightly larger active dot
+    backgroundColor: COLORS.secondary,
+    width: 8,
   },
   // --- 3. Review Bar (16px) ---
   reviewBar: {
@@ -720,14 +721,14 @@ const styles = StyleSheet.create({
   doneBtn: {
     height: 42,
     paddingHorizontal: 16,
-    backgroundColor: '#2563eb',
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     elevation: 2,
-    shadowColor: '#2563eb',
+    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
@@ -773,13 +774,13 @@ const styles = StyleSheet.create({
   freqLabelNew: {
     fontSize: 14,
     fontWeight: '900',
-    color: '#2563eb',
-    backgroundColor: '#eff6ff',
+    color: COLORS.secondary,
+    backgroundColor: '#f5f3ff',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderColor: '#e0e7ff',
   },
   divider: {
     width: 1,

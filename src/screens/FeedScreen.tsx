@@ -41,6 +41,7 @@ import {
   deletePost,
 } from '@/repositories/PostRepository';
 import { syncManager } from '@/services/SyncManager';
+import { COLORS } from '@/constants';
 
 type FeedTab = 'due' | 'reviewed' | 'trash';
 const { width } = Dimensions.get('window');
@@ -133,7 +134,7 @@ export const FeedScreen = () => {
       case 'trash':
         return 'Trash';
       default:
-        return '9naŭ IG';
+        return '9naŭ';
     }
   };
 
@@ -153,7 +154,7 @@ export const FeedScreen = () => {
   }).current;
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 40, // Item is "visible" if 40% is on screen
+    itemVisiblePercentThreshold: 40,
   }).current;
 
   return (
@@ -166,9 +167,11 @@ export const FeedScreen = () => {
       {/* Sidebar Surface */}
       <Animated.View style={[styles.sidebar, sidebarStyle, { paddingTop: insets.top }]}>
         <View style={styles.sidebarHeader}>
-          <Text style={styles.sidebarLogo}>9naŭ IG</Text>
+          <View style={styles.logoBadge}>
+            <Text style={styles.sidebarLogo}>naŭ</Text>
+          </View>
           <TouchableOpacity onPress={toggleSidebar}>
-            <X size={24} color="#000" />
+            <X size={24} color={COLORS.primary} />
           </TouchableOpacity>
         </View>
 
@@ -177,9 +180,12 @@ export const FeedScreen = () => {
             style={[styles.sidebarItem, activeTab === 'due' && styles.sidebarItemActive]}
             onPress={() => handleTabChange('due')}
           >
-            <LayoutGrid size={22} color={activeTab === 'due' ? '#2563eb' : '#4b5563'} />
+            <LayoutGrid size={22} color={activeTab === 'due' ? COLORS.secondary : '#4b5563'} />
             <Text
-              style={[styles.sidebarItemText, activeTab === 'due' && styles.sidebarItemTextActive]}
+              style={[
+                styles.sidebarItemText,
+                activeTab === 'due' && { color: COLORS.secondary, fontWeight: '800' },
+              ]}
             >
               To Review
             </Text>
@@ -189,11 +195,11 @@ export const FeedScreen = () => {
             style={[styles.sidebarItem, activeTab === 'reviewed' && styles.sidebarItemActive]}
             onPress={() => handleTabChange('reviewed')}
           >
-            <Clock size={22} color={activeTab === 'reviewed' ? '#2563eb' : '#4b5563'} />
+            <Clock size={22} color={activeTab === 'reviewed' ? COLORS.secondary : '#4b5563'} />
             <Text
               style={[
                 styles.sidebarItemText,
-                activeTab === 'reviewed' && styles.sidebarItemTextActive,
+                activeTab === 'reviewed' && { color: COLORS.secondary, fontWeight: '800' },
               ]}
             >
               History
@@ -206,11 +212,11 @@ export const FeedScreen = () => {
             style={[styles.sidebarItem, activeTab === 'trash' && styles.sidebarItemActive]}
             onPress={() => handleTabChange('trash')}
           >
-            <Trash2 size={22} color={activeTab === 'trash' ? '#ef4444' : '#4b5563'} />
+            <Trash2 size={22} color={activeTab === 'trash' ? COLORS.error : '#4b5563'} />
             <Text
               style={[
                 styles.sidebarItemText,
-                activeTab === 'trash' && styles.sidebarItemTextActive,
+                activeTab === 'trash' && { color: COLORS.error, fontWeight: '800' },
               ]}
             >
               Trash
@@ -233,7 +239,7 @@ export const FeedScreen = () => {
       {/* Top Bar */}
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity style={styles.topBarSide} onPress={toggleSidebar}>
-          <Menu size={24} color="#000" />
+          <Menu size={24} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.logo}>{getHeaderTitle()}</Text>
         <View style={styles.topBarSide} />
@@ -257,12 +263,12 @@ export const FeedScreen = () => {
             {availableTags.map((tag) => (
               <TouchableOpacity
                 key={tag}
-                onPress={() => setSelectedTag(tag === selectedTag ? null : tag)}
+                onPress={() => setSelectedTag(tag)}
                 style={[styles.tagChip, selectedTag === tag && styles.tagChipActive]}
               >
                 <TagIcon
                   size={12}
-                  color={selectedTag === tag ? '#fff' : '#4b5563'}
+                  color={selectedTag === tag ? '#fff' : '#64748b'}
                   style={{ marginRight: 4 }}
                 />
                 <Text style={[styles.tagChipText, selectedTag === tag && styles.tagChipTextActive]}>
@@ -274,77 +280,68 @@ export const FeedScreen = () => {
         </View>
       )}
 
-      <FlatList
-        data={posts}
-        keyExtractor={(item) => `${activeTab}-${item.id}`}
-        renderItem={({ item }) => {
-          if (activeTab === 'trash') {
-            return (
-              <View style={styles.trashCard}>
-                <View style={styles.trashInfo}>
-                  <Text style={styles.trashTitle}>{item.title || 'Untitled Capture'}</Text>
-                  <Text style={styles.trashDate}>Deleted on {item.deleted_at}</Text>
-                </View>
-                <View style={styles.trashActions}>
-                  <TouchableOpacity
-                    onPress={() => handleUntrash(item.id)}
-                    style={styles.untrashBtn}
-                  >
-                    <RotateCcw size={20} color="#10b981" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handlePermanentDelete(item.id)}
-                    style={styles.permaDeleteBtn}
-                  >
-                    <Trash size={20} color="#ef4444" />
-                  </TouchableOpacity>
-                </View>
+      {activeTab === 'trash' ? (
+        <FlatList
+          data={posts}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <View style={styles.trashCard}>
+              <View style={styles.trashInfo}>
+                <Text style={styles.trashTitle}>{item.title || 'Untitled Capture'}</Text>
+                <Text style={styles.trashDate}>Deleted on {item.deleted_at}</Text>
               </View>
-            );
+              <View style={styles.trashActions}>
+                <TouchableOpacity style={styles.untrashBtn} onPress={() => handleUntrash(item.id)}>
+                  <RotateCcw size={18} color="#16a34a" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.permaDeleteBtn}
+                  onPress={() => handlePermanentDelete(item.id)}
+                >
+                  <Trash size={18} color="#dc2626" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Trash2 size={48} color="#e2e8f0" />
+              <Text style={styles.emptyText}>Trash is empty</Text>
+            </View>
           }
-          return (
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        />
+      ) : (
+        <FlatList
+          data={posts}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
             <FeedItem
               post={item}
               onProcessed={loadFeed}
               isHistory={activeTab === 'reviewed'}
               isVisible={viewableItems.has(item.id)}
             />
-          );
-        }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>
-              {activeTab === 'due'
-                ? 'You reached Review Zero!'
-                : activeTab === 'reviewed'
-                  ? 'No history yet.'
-                  : 'Trash is empty.'}
-            </Text>
-            <Text style={styles.emptySubText}>
-              {activeTab === 'due'
-                ? 'Great job! Check your history or capture more content.'
-                : activeTab === 'reviewed'
-                  ? 'Reviewed posts will appear here.'
-                  : 'Deleted captures will wait here until permanent cleanup.'}
-            </Text>
-          </View>
-        }
-        contentContainerStyle={{ paddingBottom: insets.bottom }}
-        showsVerticalScrollIndicator={false}
-      />
+          )}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <LayoutGrid size={48} color="#e2e8f0" />
+              <Text style={styles.emptyText}>No captures yet</Text>
+              <Text style={styles.emptySubText}>
+                Share an Instagram post or Reel to Learning Loop to see it here.
+              </Text>
+            </View>
+          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        />
+      )}
 
-      <SettingsModal
-        visible={settingsVisible}
-        onClose={() => {
-          setSettingsVisible(false);
-          loadFeed();
-        }}
-      />
+      {settingsVisible && (
+        <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
+      )}
 
-      {/* Manual Capture Modal */}
       {manualCaptureVisible && (
         <CaptureModal
           shareValue=""
@@ -407,10 +404,16 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f3f4f6',
   },
   sidebarLogo: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '900',
+    color: '#fff',
     letterSpacing: -1,
-    color: '#000',
+  },
+  logoBadge: {
+    backgroundColor: '#3b0764',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   sidebarContent: {
     flex: 1,
@@ -425,16 +428,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   sidebarItemActive: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#f5f3ff',
     borderRadius: 12,
   },
   sidebarItemText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#4b5563',
-  },
-  sidebarItemTextActive: {
-    color: '#2563eb',
   },
   sidebarFooter: {
     borderTopWidth: 1,
@@ -461,8 +461,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   logo: {
-    color: '#000',
-    fontSize: 20,
+    color: '#3b0764',
+    fontSize: 22,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
@@ -497,8 +497,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   tagChipActive: {
-    backgroundColor: '#000',
-    borderColor: '#000',
+    backgroundColor: '#3b0764',
+    borderColor: '#3b0764',
   },
   tagChipText: {
     color: '#4b5563',
@@ -554,11 +554,11 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#2563eb',
+    backgroundColor: '#7c7cff',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 8,
-    shadowColor: '#2563eb',
+    shadowColor: '#7c7cff',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,

@@ -13,6 +13,7 @@ import {
 import { X, Globe, Database, Trash2, RefreshCcw } from 'lucide-react-native';
 import { getSetting, setSetting } from '@/repositories/SettingsRepository';
 import { getStandbyPosts, resetSyncForManualRetry } from '@/repositories/PostRepository';
+import { SYNC_POLLING_INTERVAL, COLORS } from '@/constants';
 import { syncManager } from '@/services/SyncManager';
 import { MediaCacheService } from '@/services/MediaCacheService';
 
@@ -297,7 +298,7 @@ const styles = StyleSheet.create({
   actionBtn: {
     alignItems: 'center',
     backgroundColor: '#f5f3ff',
-    borderColor: '#ede9fe',
+    borderColor: '#e0e7ff',
     borderRadius: 12,
     borderWidth: 1,
     flexDirection: 'row',
@@ -305,7 +306,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   actionBtnText: {
-    color: '#4f46e5',
+    color: COLORS.secondary,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -331,7 +332,7 @@ const styles = StyleSheet.create({
   },
   saveBtn: {
     alignItems: 'center',
-    backgroundColor: '#000',
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
     marginTop: 12,
     padding: 16,
