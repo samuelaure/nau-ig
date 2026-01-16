@@ -3,7 +3,7 @@
     "name": "9naŭ",
     "slug": "9nau-ig",
     "scheme": "nau-ig",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",

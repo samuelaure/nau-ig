@@ -282,6 +282,7 @@ export const FeedScreen = () => {
 
       {activeTab === 'trash' ? (
         <FlatList
+          key="trash-list"
           data={posts}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
@@ -313,6 +314,7 @@ export const FeedScreen = () => {
         />
       ) : (
         <FlatList
+          key="feed-list"
           data={posts}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
