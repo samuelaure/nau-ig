@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { DATABASE_NAME } from './constants';
+import { applyMigrations } from './db/MigrationManager';
 
 // For Expo 50, we use the legacy openDatabase API but wrap it for better DX
 const db = SQLite.openDatabase(DATABASE_NAME);
@@ -55,6 +56,7 @@ export const runSql = (sql: string, params: any[] = []): Promise<number> => {
 };
 
 export const initDb = async (): Promise<void> => {
+  // 1. Ensure tables exist
   await runSql(`
     CREATE TABLE IF NOT EXISTS posts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,48 +84,19 @@ export const initDb = async (): Promise<void> => {
     );
   `);
 
-  // Migration for existing databases: Check columns first to avoid noise
-  try {
-    const tableInfo = await executeSql<{ name: string }>('PRAGMA table_info(posts)');
-    const existingColumns = tableInfo.map((col) => col.name);
-
-    if (!existingColumns.includes('sync_attempts')) {
-      await runSql('ALTER TABLE posts ADD COLUMN sync_attempts INTEGER DEFAULT 0');
-    }
-    if (!existingColumns.includes('sync_status')) {
-      await runSql("ALTER TABLE posts ADD COLUMN sync_status TEXT DEFAULT 'pending'");
-    }
-    if (!existingColumns.includes('username')) {
-      await runSql('ALTER TABLE posts ADD COLUMN username TEXT');
-    }
-    if (!existingColumns.includes('profile_image')) {
-      await runSql('ALTER TABLE posts ADD COLUMN profile_image TEXT');
-    }
-    if (!existingColumns.includes('instagram_caption')) {
-      await runSql('ALTER TABLE posts ADD COLUMN instagram_caption TEXT');
-    }
-    if (!existingColumns.includes('is_deleted')) {
-      await runSql('ALTER TABLE posts ADD COLUMN is_deleted INTEGER DEFAULT 0');
-    }
-    if (!existingColumns.includes('deleted_at')) {
-      await runSql('ALTER TABLE posts ADD COLUMN deleted_at DATETIME');
-    }
-    if (!existingColumns.includes('instagram_user_id')) {
-      await runSql('ALTER TABLE posts ADD COLUMN instagram_user_id TEXT');
-    }
-    if (!existingColumns.includes('biography')) {
-      await runSql('ALTER TABLE posts ADD COLUMN biography TEXT');
-    }
-  } catch (e) {
-    console.warn('[DB] Migration check failed:', e);
-  }
-
   await runSql(`
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT
     );
   `);
+
+  // 2. Apply migrations
+  try {
+    await applyMigrations();
+  } catch (e) {
+    console.error('[DB] Migration failed:', e);
+  }
 };
 
 export default db;
