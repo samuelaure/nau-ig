@@ -76,6 +76,8 @@ export const initDb = async (): Promise<void> => {
       sm2_repetition INTEGER DEFAULT 0,
       sm2_ease_factor REAL DEFAULT 2.5,
       next_review_at DATETIME,
+      instagram_user_id TEXT,
+      biography TEXT,
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
@@ -105,6 +107,12 @@ export const initDb = async (): Promise<void> => {
     }
     if (!existingColumns.includes('deleted_at')) {
       await runSql('ALTER TABLE posts ADD COLUMN deleted_at DATETIME');
+    }
+    if (!existingColumns.includes('instagram_user_id')) {
+      await runSql('ALTER TABLE posts ADD COLUMN instagram_user_id TEXT');
+    }
+    if (!existingColumns.includes('biography')) {
+      await runSql('ALTER TABLE posts ADD COLUMN biography TEXT');
     }
   } catch (e) {
     console.warn('[DB] Migration check failed:', e);

@@ -4,6 +4,7 @@ import {
   updatePostMedia,
   incrementSyncAttempts,
   updateSyncStatus,
+  getProfileByUsername,
 } from '@/repositories/PostRepository';
 import { runSql } from '../db';
 import { ApifyService } from './ApifyService';
@@ -90,6 +91,27 @@ class SyncManager {
           const result = await ApifyService.scrapPost(post.instagramUrl, apifyToken);
 
           if (result.status === 'success' && result.mediaItems) {
+            const username = result.username || 'instagram_user';
+
+            // Check if we already have a profile for this user
+            let profileImage = result.profile_image;
+            let instagramUserId = result.instagram_user_id;
+
+            const existingProfile = await getProfileByUsername(username);
+
+            if (existingProfile) {
+              console.log(`[SyncManager] Using cached profile for ${username}`);
+              profileImage = existingProfile.profile_image;
+              instagramUserId = existingProfile.instagram_user_id;
+            } else {
+              // Try to get HD profile info from the specialized scraper
+              const profileInfo = await ApifyService.fetchProfileInfo(username, apifyToken);
+              if (profileInfo.status === 'success') {
+                profileImage = profileInfo.profile_image || profileImage;
+                instagramUserId = profileInfo.id;
+              }
+            }
+
             // Pre-cache media locally to ensure "Offline First" ownership
             const localMedia = await Promise.all(
               result.mediaItems.map(async (item) => ({
@@ -99,15 +121,16 @@ class SyncManager {
             );
 
             // Also cache the profile image locally
-            const localProfileImage = result.profile_image
-              ? await MediaCacheService.ensureMediaCached(result.profile_image)
+            const localProfileImage = profileImage
+              ? await MediaCacheService.ensureMediaCached(profileImage)
               : undefined;
 
             await updatePostMedia(post.id, {
               mediaData: localMedia,
-              username: result.username,
+              username: username,
               profile_image: localProfileImage,
               instagram_caption: result.instagram_caption,
+              instagram_user_id: instagramUserId,
             });
 
             console.log(`[SyncManager] Successfully processed post ${post.id}`);

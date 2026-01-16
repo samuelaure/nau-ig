@@ -3,9 +3,17 @@ import { MediaItem } from '@/repositories/PostRepository';
 export interface ApifyScrapResult {
   status: 'success' | 'error';
   username?: string;
+  instagram_user_id?: string;
   profile_image?: string;
   instagram_caption?: string;
   mediaItems?: MediaItem[];
+}
+
+export interface ApifyProfileResult {
+  status: 'success' | 'error';
+  id?: string;
+  username?: string;
+  profile_image?: string;
 }
 
 /**
@@ -68,15 +76,64 @@ export class ApifyService {
         });
       }
 
+      const username = item.ownerUsername || item.owner?.username;
+      const profileImage =
+        item.ownerProfilePicUrl ||
+        item.owner?.profile_pic_url ||
+        `https://unavatar.io/instagram/${username}`;
+
       return {
         status: 'success',
-        username: item.ownerUsername,
-        profile_image: item.ownerProfilePicUrl || item.owner?.profile_pic_url,
+        username,
+        profile_image: profileImage,
         instagram_caption: item.caption,
         mediaItems,
       };
     } catch (error) {
       console.error('[ApifyService] Error scraping post:', error);
+      return { status: 'error' };
+    }
+  }
+
+  /**
+   * Fetches detailed profile information using the coderx/instagram-profile-scraper-bio-posts actor.
+   */
+  static async fetchProfileInfo(username: string, token: string): Promise<ApifyProfileResult> {
+    const actorId = 'coderx~instagram-profile-scraper-bio-posts';
+    const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${token}`;
+
+    const input = {
+      usernames: [username],
+    };
+
+    try {
+      console.log(`[ApifyService] Fetching profile info for: ${username}`);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(input),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Apify Profile Scraper returned ${response.status}`);
+      }
+
+      const items = await response.json();
+      if (!Array.isArray(items) || items.length === 0) {
+        return { status: 'error' };
+      }
+
+      const info = items[0];
+      return {
+        status: 'success',
+        id: info.id,
+        username: info.username,
+        profile_image: info.hdProfilePicUrl || info.profilePicUrl,
+      };
+    } catch (error) {
+      console.error('[ApifyService] Error fetching profile info:', error);
       return { status: 'error' };
     }
   }

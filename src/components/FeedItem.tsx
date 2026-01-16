@@ -31,6 +31,7 @@ import {
   ChevronDown,
   Check,
   StickyNote,
+  User,
 } from 'lucide-react-native';
 import { MediaCacheService } from '@/services/MediaCacheService';
 import {
@@ -255,8 +256,10 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
             <>
               <View style={styles.igAvatarPlaceholder}>
                 {post.profile_image ? (
-                  <Image source={{ uri: post.profile_image }} style={styles.igAvatar} />
-                ) : null}
+                  <Image key={post.profile_image} source={{ uri: post.profile_image }} style={styles.igAvatar} />
+                ) : (
+                  <User size={18} color="#94a3b8" />
+                )}
               </View>
               <Text style={styles.igUsername}>{post.username || 'instagram_user'}</Text>
             </>
@@ -565,6 +568,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 0.5,
     borderColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   igAvatar: {
     width: '100%',

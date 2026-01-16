@@ -24,6 +24,8 @@ export interface Post {
   instagram_caption?: string;
   is_deleted: number;
   deleted_at?: string;
+  instagram_user_id?: string;
+  biography?: string;
 }
 
 export const getDuePosts = async (tagFilter?: string | null): Promise<Post[]> => {
@@ -150,6 +152,8 @@ export const updatePostMedia = async (
     username?: string;
     profile_image?: string;
     instagram_caption?: string;
+    instagram_user_id?: string;
+    biography?: string;
   },
 ): Promise<void> => {
   // First, get the current content to see if we should append/initialize with the caption
@@ -167,13 +171,15 @@ export const updatePostMedia = async (
   }
 
   await runSql(
-    "UPDATE posts SET mediaData = ?, isProcessed = 1, sync_status = 'processed', username = ?, profile_image = ?, instagram_caption = ?, content = ? WHERE id = ?",
+    "UPDATE posts SET mediaData = ?, isProcessed = 1, sync_status = 'processed', username = ?, profile_image = ?, instagram_caption = ?, content = ?, instagram_user_id = ?, biography = ? WHERE id = ?",
     [
       JSON.stringify(params.mediaData),
       params.username || null,
       params.profile_image || null,
       params.instagram_caption || null,
       newContent,
+      params.instagram_user_id || null,
+      params.biography || null,
       id,
     ],
   );
@@ -189,6 +195,22 @@ export const untrashPost = async (id: number): Promise<void> => {
 
 export const getDeletedPosts = async (): Promise<Post[]> => {
   return executeSql<Post>('SELECT * FROM posts WHERE is_deleted = 1 ORDER BY deleted_at DESC');
+};
+
+export const getProfileByUsername = async (
+  username: string,
+): Promise<{ profile_image: string; instagram_user_id: string } | null> => {
+  const rows = await executeSql<Post>(
+    'SELECT profile_image, instagram_user_id FROM posts WHERE username = ? AND instagram_user_id IS NOT NULL LIMIT 1',
+    [username],
+  );
+  if (rows.length > 0) {
+    return {
+      profile_image: rows[0].profile_image!,
+      instagram_user_id: rows[0].instagram_user_id!,
+    };
+  }
+  return null;
 };
 
 export const savePost = async (post: any): Promise<number> => {
