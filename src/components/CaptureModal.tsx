@@ -30,7 +30,6 @@ import {
 } from 'lucide-react-native';
 import { savePost, getAllTags } from '@/repositories/PostRepository';
 import { getSetting } from '@/repositories/SettingsRepository';
-import { sendToMake } from '@/services/SyncService';
 import { syncManager } from '@/services/SyncManager';
 import { COLORS } from '@/constants';
 
@@ -184,21 +183,8 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({ shareValue, onClose 
       const postId = await savePost(postData);
       console.log('[CaptureModal] savePost success. postId:', postId);
 
-      const webhookUrl = await getSetting('make_webhook_url');
-      if (webhookUrl) {
-        console.log('[CaptureModal] Triggering webhook (async)...');
-        // Do NOT await the webhook so the UI closes immediately
-        sendToMake(webhookUrl, {
-          action: 'capture',
-          instagramUrl: cleanUrl.current,
-          postId: postId,
-        }).then(() => {
-          console.log('[CaptureModal] Webhook async success');
-          // Wake up the background sync manager to start downloading the new capture
-          syncManager.triggerSync();
-        })
-          .catch(err => console.warn('[CaptureModal] Webhook async failed:', err));
-      }
+      // Wake up the background sync manager to start downloading the new capture
+      syncManager.triggerSync();
 
       console.log('[CaptureModal] Showing success toast');
       if (Platform.OS === 'android') {

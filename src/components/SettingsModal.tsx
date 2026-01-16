@@ -12,8 +12,7 @@ import {
 } from 'react-native';
 import { X, Globe, Database, Trash2, RefreshCcw } from 'lucide-react-native';
 import { getSetting, setSetting } from '@/repositories/SettingsRepository';
-import { getStandbyPosts, resetSyncForManualRetry, updatePostMedia } from '@/repositories/PostRepository';
-import { sendToMake } from '@/services/SyncService';
+import { getStandbyPosts, resetSyncForManualRetry } from '@/repositories/PostRepository';
 import { syncManager } from '@/services/SyncManager';
 import { MediaCacheService } from '@/services/MediaCacheService';
 
@@ -23,7 +22,7 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
-  const [webhookUrl, setWebhookUrl] = useState('');
+  const [apifyToken, setApifyToken] = useState('');
   const [isClearing, setIsClearing] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
   const [standbyCount, setStandbyCount] = useState(0);
@@ -39,13 +38,13 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
 
   useEffect(() => {
     if (visible) {
-      getSetting('make_webhook_url').then((val) => setWebhookUrl(val || ''));
+      getSetting('apify_api_token').then((val) => setApifyToken(val || ''));
       loadStandbyCount();
     }
   }, [visible]);
 
   const handleSave = async () => {
-    await setSetting('make_webhook_url', webhookUrl);
+    await setSetting('apify_api_token', apifyToken);
     onClose();
   };
 
@@ -80,46 +79,36 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
     setIsRecovering(true);
     try {
       const standbyPosts = await getStandbyPosts();
-      const currentWebhookUrl = await getSetting('make_webhook_url');
-      if (!currentWebhookUrl) throw new Error('Webhook URL not configured');
+      const currentToken = await getSetting('apify_api_token');
+      if (!currentToken) throw new Error('Apify API Token not configured');
 
-      console.log(`[Recovery] Querying webhook for ${standbyPosts.length} standby items...`);
+      console.log(`[Recovery] Querying Apify for ${standbyPosts.length} standby items...`);
 
-      const response = await sendToMake(currentWebhookUrl, {
-        action: 'manual_recovery' as any,
-        items: standbyPosts.map(p => ({ id: p.id, url: p.instagramUrl })),
-      });
+      // TODO: Update this to use ApifyService once implemented
+      setStandbyCount(standbyPosts.length);
 
-      if (response.status === 'success' && response.results) {
-        let recovered = 0;
-        let restarted = 0;
-        const toRestart: number[] = [];
+      let recovered = 0;
+      let failed = 0;
 
-        for (const p of standbyPosts) {
-          const result = response.results[p.id];
-          if (result?.status === 'success' && result.mediaData) {
-            await updatePostMedia(p.id, result.mediaData);
-            recovered++;
-          } else {
-            toRestart.push(p.id);
-            restarted++;
-          }
+      for (const p of standbyPosts) {
+        try {
+          // We reset the status to pending and sync attempts to 0, 
+          // then let the syncManager do its work or we call process directly.
+          await resetSyncForManualRetry([p.id]);
+          recovered++;
+        } catch (e) {
+          failed++;
         }
-
-        if (toRestart.length > 0) {
-          await resetSyncForManualRetry(toRestart);
-          // Wake up the background sync manager to process the restarted tasks
-          syncManager.triggerSync();
-        }
-
-        Alert.alert(
-          'Recovery Finished',
-          `${recovered} instant recoveries. ${restarted} tasks restarted.`
-        );
-        loadStandbyCount();
-      } else {
-        throw new Error('Webhook returned unsuccessful status');
       }
+
+      // Wake up the background sync manager to process the restarted tasks
+      syncManager.triggerSync();
+
+      Alert.alert(
+        'Recovery Triggered',
+        `${recovered} captures have been queued for processing. They will appear in the feed as they finish.`
+      );
+      loadStandbyCount();
     } catch (e: any) {
       Alert.alert('Recovery Failed', e.message || 'Check your connection and webhook URL.');
     } finally {
@@ -143,17 +132,18 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
             </View>
 
             <View style={styles.content}>
-              {/* Webhook Settings */}
-              <Text style={styles.label}>Make.com Webhook URL</Text>
+              {/* API Settings */}
+              <Text style={styles.label}>Apify API Token</Text>
               <View style={styles.inputContainer}>
                 <Globe size={18} color="#9ca3af" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="https://hook.make.com/..."
-                  value={webhookUrl}
-                  onChangeText={setWebhookUrl}
+                  placeholder="apify_api_..."
+                  value={apifyToken}
+                  onChangeText={setApifyToken}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  secureTextEntry
                 />
               </View>
 
