@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Animated,
   TextInput,
+  Modal,
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import {
@@ -38,7 +39,7 @@ import {
 } from 'lucide-react-native';
 import { MediaCacheService } from '@/services/MediaCacheService';
 import { syncManager } from '@/services/SyncManager';
-import { formatDaysToFrequency } from '@/services/FrequencyService';
+import { formatDaysToFrequency, getFrequencyChain, parseFrequencyToDays } from '@/services/FrequencyService';
 import {
   Post,
   MediaItem,
@@ -82,6 +83,8 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [mediaAspectRatio, setMediaAspectRatio] = useState(1);
+  const [showFreqModal, setShowFreqModal] = useState(false);
+  const [freqChain, setFreqChain] = useState<string[]>([]);
 
   const isSimpleNote = !post.instagramUrl;
 
@@ -162,6 +165,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
       }
     };
     prepareMedia();
+    getFrequencyChain().then(setFreqChain);
   }, [post.mediaData, post.isProcessed, post.tags, pulseAnim, retrySeed]);
 
   const handlePersist = useCallback(async () => {
@@ -202,6 +206,21 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
       onProcessed();
     } catch (e) {
       console.error('Failed to update frequency', e);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleSelectFrequency = async (freqString: string) => {
+    const days = parseFrequencyToDays(freqString);
+    setIsUpdating(true);
+    setShowFreqModal(false);
+    try {
+      await updatePostInterval(post.id, days);
+      setDraftInterval(days);
+      onProcessed();
+    } catch (e) {
+      console.error('Failed to set manual frequency', e);
     } finally {
       setIsUpdating(false);
     }
@@ -448,11 +467,15 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
         </TouchableOpacity>
 
         <View style={styles.rightActionsGroup}>
-          <View style={styles.freqDisplayContainer}>
+          <TouchableOpacity
+            style={styles.freqDisplayContainer}
+            onPress={() => setShowFreqModal(true)}
+            activeOpacity={0.7}
+          >
             <Text style={styles.freqLabel}>
               {formatDaysToFrequency(draftInterval)}
             </Text>
-          </View>
+          </TouchableOpacity>
 
           <View style={styles.divider} />
 
@@ -562,6 +585,49 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
           </Text>
         </View>
       </View>
+
+      {/* Frequency Quick Select Modal */}
+      <Modal
+        visible={showFreqModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFreqModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowFreqModal(false)}
+        >
+          <View style={styles.popupContent} onStartShouldSetResponder={() => true}>
+            <Text style={styles.popupTitle}>Quick Select Frequency</Text>
+            <View style={styles.quickFreqGrid}>
+              {freqChain.map((freq) => (
+                <TouchableOpacity
+                  key={freq}
+                  style={[
+                    styles.quickFreqChip,
+                    parseFrequencyToDays(freq) === draftInterval && styles.quickFreqChipActive
+                  ]}
+                  onPress={() => handleSelectFrequency(freq)}
+                >
+                  <Text style={[
+                    styles.quickFreqChipText,
+                    parseFrequencyToDays(freq) === draftInterval && styles.quickFreqChipTextActive
+                  ]}>
+                    {freq}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={[styles.doneBtn, { marginTop: 24 }]}
+              onPress={() => setShowFreqModal(false)}
+            >
+              <Text style={styles.modalDoneBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -931,6 +997,65 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#94a3b8',
     fontStyle: 'italic',
+  },
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  popupContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 24,
+    width: '85%',
+    maxWidth: 340,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 15,
+  },
+  popupTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  quickFreqGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'center',
+  },
+  quickFreqChip: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  quickFreqChipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  quickFreqChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  quickFreqChipTextActive: {
+    color: '#fff',
+  },
+  modalDoneBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });
 
