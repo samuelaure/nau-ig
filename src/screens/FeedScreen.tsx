@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -66,6 +67,11 @@ export const FeedScreen = () => {
   const [labels, setLabels] = useState<Label[]>([]);
   const [labelsModalVisible, setLabelsModalVisible] = useState(false);
 
+  // Pagination State
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const LIMIT = 20;
+
   // Animation values for Sidebar
   const sidebarOffset = useSharedValue(-width * 0.85);
   const overlayOpacity = useSharedValue(0);
@@ -80,59 +86,120 @@ export const FeedScreen = () => {
     overlayOpacity.value = withTiming(nextState ? 1 : 0, { duration: 300 });
   };
 
-  const loadFeed = useCallback(async () => {
+  /**
+   * Loads posts with pagination support.
+   * @param isLoadMore If true, appends to existing list. If false, resets list.
+   */
+  const loadFeed = useCallback(async (isLoadMore = false) => {
+    // Prevent loading if already loading more or if no more items
+    if (isLoadMore && (isLoadingMore || !hasMore)) return;
+
     try {
+      if (isLoadMore) {
+        setIsLoadingMore(true);
+      } else {
+        // If refreshing or changing tabs, we might want to set refreshing state externally or just load
+        // We'll trust the caller to handle UI loading states (like onRefresh)
+      }
+
+      // Calculate offset based on current posts length if loading more, else 0
+      const currentOffset = isLoadMore ? posts.length : 0;
+
       let data: Post[] = [];
       if (activeTab === 'due') {
-        data = await getDuePosts(selectedTag);
+        data = await getDuePosts(selectedTag, LIMIT, currentOffset);
       } else if (activeTab === 'reviewed') {
-        data = await getReviewedPosts(selectedTag);
+        data = await getReviewedPosts(selectedTag, LIMIT, currentOffset);
       } else if (activeTab === 'trash') {
-        data = await getDeletedPosts();
+        data = await getDeletedPosts(LIMIT, currentOffset);
       } else if (activeTab === 'unscheduled') {
-        data = await getUnscheduledPosts(selectedTag);
+        data = await getUnscheduledPosts(selectedTag, LIMIT, currentOffset);
       } else if (activeTab === 'label' && selectedTag) {
-        data = await getPostsByTag(selectedTag);
+        data = await getPostsByTag(selectedTag, LIMIT, currentOffset);
       }
-      setPosts(data);
 
-      const [tags, allLabels] = await Promise.all([getAllTags(), getAllLabels()]);
-      setAvailableTags(tags);
-      setLabels(allLabels);
+      if (isLoadMore) {
+        setPosts((prev) => [...prev, ...data]);
+      } else {
+        setPosts(data);
+      }
+
+      // Check if we reached the end
+      if (data.length < LIMIT) {
+        setHasMore(false);
+      } else {
+        setHasMore(true);
+      }
+
+      // Always refresh tags/labels on initial load (not on load more to save bandwidth/perf)
+      if (!isLoadMore) {
+        const [tags, allLabels] = await Promise.all([getAllTags(), getAllLabels()]);
+        setAvailableTags(tags);
+        setLabels(allLabels);
+      }
     } catch (error) {
       console.error('Failed to load feed:', error);
+    } finally {
+      setIsLoadingMore(false);
     }
+  }, [activeTab, selectedTag, posts.length, hasMore, isLoadingMore]);
+
+  // Initial Load & Tab Change
+  // We use a separate effect to trigger the "Reset" load when tab/tag changes
+  useEffect(() => {
+    // Reset state before loading
+    setHasMore(true);
+    // We don't necessarily need to clear posts immediately to avoid flash, but consistent behavior is better
+    // loadFeed(false) will overwrite posts.
+    loadFeed(false);
   }, [activeTab, selectedTag]);
 
+  // Sync subscription
   useEffect(() => {
-    loadFeed();
     syncManager.triggerSync(15000);
     const unsubscribe = syncManager.subscribe(() => {
-      loadFeed();
+      // On sync complete, we refresh the list (resetting to top) to show new items
+      // This is the safest way to ensure consistency
+      loadFeed(false);
     });
     return () => {
       unsubscribe();
       syncManager.stop();
     };
-  }, [loadFeed]);
+  }, []); // Only on mount
 
   const onRefresh = async () => {
     setRefreshing(true);
     await syncManager.performSync();
-    await loadFeed();
+    await loadFeed(false);
     setRefreshing(false);
   };
 
-
   const handleUntrash = async (id: number) => {
     await untrashPost(id);
-    loadFeed();
+    // Remove locally to avoid full reload
+    setPosts(current => current.filter(p => p.id !== id));
   };
 
   const handlePermanentDelete = async (id: number) => {
     await deletePost(id);
-    loadFeed();
+    setPosts(current => current.filter(p => p.id !== id));
   };
+
+  // Called by FeedItem when it changes state (e.g. marked as done)
+  // We reload to ensure list consistency, but we could optimize to remove locally.
+  // For 'reviewed' -> 'done', it disappears from 'due' list.
+  // Ideally we remove it from the list locally.
+  const handlePostProcessed = useCallback(() => {
+    // For simplicity and correctness, we reload the feed. 
+    // To preserve scroll, we might want to avoid full reload, but if an item moves tabs, it should vanish.
+    // If we have many items, a full reload (page 0) is annoying.
+    // Let's try to just reload page 0 or just trigger a refresh.
+    // For now, re-fetch the current set? No, complexity.
+    // Standard approach: Reload text. 
+    loadFeed(false);
+  }, [loadFeed]);
+
 
   const getHeaderTitle = () => {
     switch (activeTab) {
@@ -151,11 +218,13 @@ export const FeedScreen = () => {
     }
   };
 
-  const handleLabelSelect = (labelName: string) => {
+  const handleLabelSelect = useCallback((labelName: string) => {
     setSelectedTag(labelName);
     setActiveTab('label');
-    toggleSidebar();
-  };
+    setSidebarVisible(false); // Close sidebar directly
+    sidebarOffset.value = withSpring(-width * 0.85);
+    overlayOpacity.value = withTiming(0);
+  }, [sidebarOffset, overlayOpacity]);
 
   const handleTabChange = (tab: FeedTab) => {
     setActiveTab(tab);
@@ -183,6 +252,15 @@ export const FeedScreen = () => {
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 40,
   }).current;
+
+  const renderFooter = () => {
+    if (!isLoadingMore) return <View style={{ height: 50 }} />;
+    return (
+      <View style={styles.loaderFooter}>
+        <ActivityIndicator size="small" color={COLORS.primary} />
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -398,6 +476,13 @@ export const FeedScreen = () => {
               </View>
             }
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            onEndReached={() => loadFeed(true)}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={renderFooter}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            removeClippedSubviews={true}
           />
         ) : (
           <FlatList
@@ -407,7 +492,15 @@ export const FeedScreen = () => {
             renderItem={({ item }) => (
               <FeedItem
                 post={item}
-                onProcessed={loadFeed}
+                onUpdate={(id, changes) => {
+                  setPosts((current) =>
+                    current.map((p) => (p.id === id ? { ...p, ...changes } : p))
+                  );
+                }}
+                onRemove={(id) => {
+                  setPosts((current) => current.filter((p) => p.id !== id));
+                }}
+                onProcessed={handlePostProcessed} // Keep as fallback for complex reloads
                 isHistory={activeTab === 'reviewed'}
                 isVisible={viewableItems.has(item.id)}
                 onLabelClick={handleLabelSelect}
@@ -425,6 +518,13 @@ export const FeedScreen = () => {
               </View>
             }
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            onEndReached={() => loadFeed(true)}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={renderFooter}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            removeClippedSubviews={true}
           />
         )
       }
@@ -441,7 +541,7 @@ export const FeedScreen = () => {
             shareValue=""
             onClose={() => {
               setManualCaptureVisible(false);
-              loadFeed();
+              loadFeed(false);
             }}
             isShareIntent={false}
           />
@@ -466,7 +566,7 @@ export const FeedScreen = () => {
           <LabelManagementModal
             visible={labelsModalVisible}
             onClose={() => setLabelsModalVisible(false)}
-            onLabelsChanged={loadFeed}
+            onLabelsChanged={() => loadFeed(false)}
           />
         )
       }
@@ -686,5 +786,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 6,
     zIndex: 999,
+  },
+  loaderFooter: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

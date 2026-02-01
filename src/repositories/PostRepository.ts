@@ -30,7 +30,7 @@ export interface Post {
   sm2_repetition: number;
 }
 
-export const getDuePosts = async (tagFilter?: string | null): Promise<Post[]> => {
+export const getDuePosts = async (tagFilter?: string | null, limit = 20, offset = 0): Promise<Post[]> => {
   let query = `SELECT * FROM posts WHERE is_deleted = 0 AND sm2_interval > 0 AND (next_review_at <= datetime('now') OR next_review_at IS NULL)`;
   const params: any[] = [];
 
@@ -39,11 +39,12 @@ export const getDuePosts = async (tagFilter?: string | null): Promise<Post[]> =>
     params.push(`%${tagFilter}%`);
   }
 
-  query += ` ORDER BY next_review_at ASC`;
+  query += ` ORDER BY next_review_at ASC LIMIT ? OFFSET ?`;
+  params.push(limit, offset);
   return executeSql<Post>(query, params);
 };
 
-export const getReviewedPosts = async (tagFilter?: string | null): Promise<Post[]> => {
+export const getReviewedPosts = async (tagFilter?: string | null, limit = 20, offset = 0): Promise<Post[]> => {
   let query = `SELECT * FROM posts WHERE is_deleted = 0 AND next_review_at > datetime('now')`;
   const params: any[] = [];
 
@@ -52,11 +53,12 @@ export const getReviewedPosts = async (tagFilter?: string | null): Promise<Post[
     params.push(`%${tagFilter}%`);
   }
 
-  query += ` ORDER BY next_review_at DESC`;
+  query += ` ORDER BY next_review_at DESC LIMIT ? OFFSET ?`;
+  params.push(limit, offset);
   return executeSql<Post>(query, params);
 };
 
-export const getUnscheduledPosts = async (tagFilter?: string | null): Promise<Post[]> => {
+export const getUnscheduledPosts = async (tagFilter?: string | null, limit = 20, offset = 0): Promise<Post[]> => {
   let query = `SELECT * FROM posts WHERE is_deleted = 0 AND (sm2_interval = 0 OR sm2_interval IS NULL)`;
   const params: any[] = [];
 
@@ -65,14 +67,15 @@ export const getUnscheduledPosts = async (tagFilter?: string | null): Promise<Po
     params.push(`%${tagFilter}%`);
   }
 
-  query += ` ORDER BY id DESC`;
+  query += ` ORDER BY id DESC LIMIT ? OFFSET ?`;
+  params.push(limit, offset);
   return executeSql<Post>(query, params);
 };
 
-export const getPostsByTag = async (tag: string): Promise<Post[]> => {
+export const getPostsByTag = async (tag: string, limit = 20, offset = 0): Promise<Post[]> => {
   return executeSql<Post>(
-    "SELECT * FROM posts WHERE is_deleted = 0 AND tags LIKE ? ORDER BY next_review_at ASC",
-    [`%${tag}%`]
+    "SELECT * FROM posts WHERE is_deleted = 0 AND tags LIKE ? ORDER BY next_review_at ASC LIMIT ? OFFSET ?",
+    [`%${tag}%`, limit, offset]
   );
 };
 
@@ -254,8 +257,8 @@ export const untrashPost = async (id: number): Promise<void> => {
   await runSql('UPDATE posts SET is_deleted = 0, deleted_at = NULL WHERE id = ?', [id]);
 };
 
-export const getDeletedPosts = async (): Promise<Post[]> => {
-  return executeSql<Post>('SELECT * FROM posts WHERE is_deleted = 1 ORDER BY deleted_at DESC');
+export const getDeletedPosts = async (limit = 20, offset = 0): Promise<Post[]> => {
+  return executeSql<Post>('SELECT * FROM posts WHERE is_deleted = 1 ORDER BY deleted_at DESC LIMIT ? OFFSET ?', [limit, offset]);
 };
 
 export const getProfileByUsername = async (

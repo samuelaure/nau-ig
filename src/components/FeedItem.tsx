@@ -59,13 +59,15 @@ const { width } = Dimensions.get('window');
 
 interface FeedItemProps {
   post: Post;
-  onProcessed: () => void;
+  onProcessed?: () => void; // Deprecated, kept for backward compat if needed or complex cases
+  onUpdate?: (id: number, changes: Partial<Post>) => void;
+  onRemove?: (id: number) => void;
   isHistory?: boolean;
   isVisible?: boolean;
   onLabelClick?: (label: string) => void;
 }
 
-export const FeedItem = ({ post, onProcessed, isHistory, isVisible, onLabelClick }: FeedItemProps) => {
+export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isHistory, isVisible, onLabelClick }: FeedItemProps) => {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,6 +100,14 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible, onLabelClick
   // Track if we need to blur properly
   const titleInputRef = useRef<TextInput>(null);
   const noteInputRef = useRef<TextInput>(null);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     // Only overwrite drafts if the user isn't currently editing.
@@ -152,18 +162,21 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible, onLabelClick
             };
           }),
         );
-        setMedia(cachedData);
 
-        // Try to get aspect ratio for the first item if it's an image
-        if (cachedData.length > 0 && cachedData[0].type === 'image') {
-          Image.getSize(cachedData[0].localUri || cachedData[0].url, (w, h) => {
-            if (w && h) setMediaAspectRatio(w / h);
-          });
+        if (isMounted.current) {
+          setMedia(cachedData);
+
+          // Try to get aspect ratio for the first item if it's an image
+          if (cachedData.length > 0 && cachedData[0].type === 'image') {
+            Image.getSize(cachedData[0].localUri || cachedData[0].url, (w, h) => {
+              if (isMounted.current && w && h) setMediaAspectRatio(w / h);
+            });
+          }
         }
       } catch (e) {
         console.error('JSON Parse error for post media', e);
       } finally {
-        setLoading(false);
+        if (isMounted.current) setLoading(false);
       }
     };
     prepareMedia();
@@ -182,10 +195,16 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible, onLabelClick
     }
 
     if (hasChanged) {
-      // Refresh the parent so the 'post' prop eventually catches up
-      onProcessed();
+      if (onUpdate) {
+        onUpdate(post.id, {
+          title: titleDraft !== post.title ? titleDraft : undefined,
+          content: noteDraft !== post.content ? noteDraft : undefined,
+        });
+      } else {
+        onProcessed?.();
+      }
     }
-  }, [post.id, post.title, post.content, titleDraft, noteDraft]);
+  }, [post.id, post.title, post.content, titleDraft, noteDraft, onUpdate, onProcessed]);
 
   // Debounced save while editing
   useEffect(() => {
@@ -204,12 +223,18 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible, onLabelClick
     setIsUpdating(true);
     try {
       const next = await updatePostFrequency(post.id, direction);
-      setDraftInterval(next);
-      onProcessed();
+      if (isMounted.current) {
+        setDraftInterval(next);
+        if (onUpdate) {
+          onUpdate(post.id, { sm2_interval: next });
+        } else {
+          onProcessed?.();
+        }
+      }
     } catch (e) {
       console.error('Failed to update frequency', e);
     } finally {
-      setIsUpdating(false);
+      if (isMounted.current) setIsUpdating(false);
     }
   };
 
@@ -219,12 +244,18 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible, onLabelClick
     setShowFreqModal(false);
     try {
       await updatePostInterval(post.id, days);
-      setDraftInterval(days);
-      onProcessed();
+      if (isMounted.current) {
+        setDraftInterval(days);
+        if (onUpdate) {
+          onUpdate(post.id, { sm2_interval: days });
+        } else {
+          onProcessed?.();
+        }
+      }
     } catch (e) {
       console.error('Failed to set manual frequency', e);
     } finally {
-      setIsUpdating(false);
+      if (isMounted.current) setIsUpdating(false);
     }
   };
 
@@ -234,14 +265,16 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible, onLabelClick
     try {
       if (isHistory) {
         await unmarkPostAsReviewed(post.id);
+        // If unmarking from history, it might disappear from history tab, so remove
+        onRemove ? onRemove(post.id) : onProcessed?.();
       } else {
         await markPostAsReviewed(post.id, draftInterval);
+        onRemove ? onRemove(post.id) : onProcessed?.();
       }
-      onProcessed();
     } catch (e) {
       console.error('Failed to toggle review status', e);
     } finally {
-      setIsUpdating(false);
+      if (isMounted.current) setIsUpdating(false);
     }
   };
 
@@ -257,12 +290,12 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible, onLabelClick
       setIsUpdating(true);
       await resetPostForRedownload(post.id);
       syncManager.triggerSync(); // Trigger sync immediately
-      onProcessed(); // Refresh parent to show loading state
-      setMenuVisible(false);
+      onProcessed?.(); // Hard reload needed here probably
+      if (isMounted.current) setMenuVisible(false);
     } catch (e) {
       console.error('Failed to trigger re-download', e);
     } finally {
-      setIsUpdating(false);
+      if (isMounted.current) setIsUpdating(false);
     }
   };
 
@@ -273,9 +306,11 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible, onLabelClick
     }
     try {
       await moveToTrash(post.id);
-      setIsConfirmingDelete(false);
-      setMenuVisible(false);
-      onProcessed();
+      if (isMounted.current) {
+        setIsConfirmingDelete(false);
+        setMenuVisible(false);
+      }
+      onRemove ? onRemove(post.id) : onProcessed?.();
     } catch (e) {
       console.error('Failed to delete post', e);
     }
@@ -631,14 +666,21 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible, onLabelClick
               onPress={async () => {
                 setIsUpdating(true);
                 setShowFreqModal(false);
+
                 try {
                   await updatePostInterval(post.id, 0);
-                  setDraftInterval(0);
-                  onProcessed();
+                  if (isMounted.current) {
+                    setDraftInterval(0);
+                    if (onUpdate) {
+                      onUpdate(post.id, { sm2_interval: 0 });
+                    } else {
+                      onProcessed?.();
+                    }
+                  }
                 } catch (e) {
                   console.error('Failed to remove frequency', e);
                 } finally {
-                  setIsUpdating(false);
+                  if (isMounted.current) setIsUpdating(false);
                 }
               }}
             >
@@ -656,7 +698,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible, onLabelClick
       </Modal>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
