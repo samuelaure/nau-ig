@@ -36,6 +36,7 @@ import {
   RefreshCw,
   RotateCw,
   Undo2,
+  CalendarOff,
 } from 'lucide-react-native';
 import { MediaCacheService } from '@/services/MediaCacheService';
 import { syncManager } from '@/services/SyncManager';
@@ -619,6 +620,26 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
                 </TouchableOpacity>
               ))}
             </View>
+
+            <TouchableOpacity
+              style={styles.removeFreqBtn}
+              onPress={async () => {
+                setIsUpdating(true);
+                setShowFreqModal(false);
+                try {
+                  await updatePostInterval(post.id, 0);
+                  setDraftInterval(0);
+                  onProcessed();
+                } catch (e) {
+                  console.error('Failed to remove frequency', e);
+                } finally {
+                  setIsUpdating(false);
+                }
+              }}
+            >
+              <CalendarOff size={18} color="#ef4444" />
+              <Text style={styles.removeFreqText}>Remove Schedule (Deactivate)</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.doneBtn, { marginTop: 24 }]}
               onPress={() => setShowFreqModal(false)}
@@ -636,6 +657,21 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
     marginBottom: 24,
+  },
+  removeFreqBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginTop: 16,
+    gap: 8,
+    backgroundColor: '#fef2f2',
+    borderRadius: 8,
+  },
+  removeFreqText: {
+    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '600',
   },
   mediaWrapper: {
     width: width,
