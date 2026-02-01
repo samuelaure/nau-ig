@@ -44,10 +44,45 @@ const migrations: Migration[] = [
     },
   },
   // Add future migrations here:
-  // {
-  //   version: 2,
-  //   up: async () => { ... }
-  // }
+  {
+    version: 2,
+    up: async () => {
+      // Create labels table
+      await runSql(`
+        CREATE TABLE IF NOT EXISTS labels (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT UNIQUE NOT NULL,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      // Populate labels table with existing tags from posts
+      const rows = await executeSql<{ tags: string }>(
+        'SELECT tags FROM posts WHERE tags IS NOT NULL',
+      );
+      const allTags = new Set<string>();
+      rows.forEach((row) => {
+        try {
+          const tags: string[] = JSON.parse(row.tags);
+          tags.forEach((t) => {
+            if (t && t.trim()) {
+              allTags.add(t.trim());
+            }
+          });
+        } catch (e) {
+          /* ignore parse errors */
+        }
+      });
+
+      for (const tag of allTags) {
+        try {
+          await runSql('INSERT OR IGNORE INTO labels (name) VALUES (?)', [tag]);
+        } catch (e) {
+          console.error(`[Migration] Failed to insert tag: ${tag}`, e);
+        }
+      }
+    },
+  },
 ];
 
 export const applyMigrations = async () => {

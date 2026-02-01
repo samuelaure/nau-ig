@@ -69,6 +69,13 @@ export const getUnscheduledPosts = async (tagFilter?: string | null): Promise<Po
   return executeSql<Post>(query, params);
 };
 
+export const getPostsByTag = async (tag: string): Promise<Post[]> => {
+  return executeSql<Post>(
+    "SELECT * FROM posts WHERE is_deleted = 0 AND tags LIKE ? ORDER BY next_review_at ASC",
+    [`%${tag}%`]
+  );
+};
+
 /**
  * Fetches all unique tags used across all posts to populate the Filter Bar.
  */
