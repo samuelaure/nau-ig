@@ -96,7 +96,7 @@ export const getAllTags = async (): Promise<string[]> => {
         /* ignore parse errors */
       }
     });
-    return Array.from(allTags);
+    return Array.from(allTags).sort();
   } catch (err) {
     return [];
   }

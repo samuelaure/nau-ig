@@ -142,7 +142,7 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
     const prepareMedia = async () => {
       if (post.tags) {
         try {
-          setTags(JSON.parse(post.tags));
+          setTags(JSON.parse(post.tags).sort());
         } catch (e) { }
       }
 
