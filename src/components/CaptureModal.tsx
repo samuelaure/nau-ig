@@ -14,6 +14,7 @@ import {
   Animated,
   Modal,
   ToastAndroid,
+  Switch,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
@@ -56,6 +57,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
   // Frequency States
   const [repeatInterval, setRepeatInterval] = useState('1');
   const [repeatUnit, setRepeatUnit] = useState('Days');
+  const [hasFrequency, setHasFrequency] = useState(false);
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [pickerDate, setPickerDate] = useState(new Date());
 
@@ -192,7 +194,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
         title: title || (finalUrl ? 'Instagram Capture' : 'New Note'),
         content: note,
         tags: selectedTags,
-        frequency: `${repeatInterval} ${repeatUnit}`,
+        frequency: hasFrequency ? `${repeatInterval} ${repeatUnit}` : null,
         startDate: startDate,
       };
 
@@ -292,8 +294,8 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.iconButton} onPress={() => setShowFreqPicker(true)}>
-                <RotateCw size={20} color="#5f6368" />
-                {isFreqCustomized && (
+                <RotateCw size={20} color={hasFrequency ? COLORS.primary : "#5f6368"} />
+                {hasFrequency && (
                   <View style={[styles.badge, { backgroundColor: COLORS.success }]}>
                     <Check size={10} color="#fff" />
                   </View>
@@ -405,104 +407,118 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
             <View style={styles.popupContent} onStartShouldSetResponder={() => true}>
               <Text style={styles.popupTitle}>Repetition</Text>
 
-              <View style={styles.freqRow}>
-                <Text style={styles.freqLabel}>Every</Text>
-                <TextInput
-                  style={styles.freqInput}
-                  keyboardType="numeric"
-                  value={repeatInterval}
-                  onChangeText={setRepeatInterval}
+              <View style={[styles.freqRow, { justifyContent: 'space-between', marginBottom: 20 }]}>
+                <Text style={styles.freqLabel}>Schedule</Text>
+                <Switch
+                  value={hasFrequency}
+                  onValueChange={setHasFrequency}
+                  trackColor={{ false: '#d1d5db', true: COLORS.primary }}
+                  thumbColor="#fff"
                 />
+              </View>
 
-                <View style={styles.dropdownContainer}>
-                  <TouchableOpacity
-                    style={styles.dropdownTrigger}
-                    onPress={() => setShowUnitDropdown(!showUnitDropdown)}
-                  >
-                    <Text style={styles.dropdownValue}>{repeatUnit}</Text>
-                    <ChevronDown size={16} color="#5f6368" />
-                  </TouchableOpacity>
+              {hasFrequency && (
+                <>
+                  <View style={styles.freqRow}>
+                    <Text style={styles.freqLabel}>Every</Text>
+                    <TextInput
+                      style={styles.freqInput}
+                      keyboardType="numeric"
+                      value={repeatInterval}
+                      onChangeText={setRepeatInterval}
+                    />
 
-                  {showUnitDropdown && (
-                    <View style={styles.dropdownList}>
-                      {UNITS.map((u) => (
-                        <TouchableOpacity
-                          key={u}
-                          style={styles.dropdownItem}
-                          onPress={() => {
-                            setRepeatUnit(u);
-                            setShowUnitDropdown(false);
-                          }}
-                        >
-                          <Text
-                            style={[
-                              styles.dropdownItemText,
-                              repeatUnit === u && styles.dropdownItemTextActive,
-                            ]}
+                    <View style={styles.dropdownContainer}>
+                      <TouchableOpacity
+                        style={styles.dropdownTrigger}
+                        onPress={() => setShowUnitDropdown(!showUnitDropdown)}
+                      >
+                        <Text style={styles.dropdownValue}>{repeatUnit}</Text>
+                        <ChevronDown size={16} color="#5f6368" />
+                      </TouchableOpacity>
+
+                      {showUnitDropdown && (
+                        <View style={styles.dropdownList}>
+                          {UNITS.map((u) => (
+                            <TouchableOpacity
+                              key={u}
+                              style={styles.dropdownItem}
+                              onPress={() => {
+                                setRepeatUnit(u);
+                                setShowUnitDropdown(false);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  styles.dropdownItemText,
+                                  repeatUnit === u && styles.dropdownItemTextActive,
+                                ]}
+                              >
+                                {u}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  {freqChain.length > 0 && (
+                    <View style={styles.quickFreqContainer}>
+                      <Text style={styles.quickFreqLabel}>Quick Select</Text>
+                      <View style={styles.quickFreqGrid}>
+                        {freqChain.slice(0, 8).map((freq) => (
+                          <TouchableOpacity
+                            key={freq}
+                            style={styles.quickFreqChip}
+                            onPress={() => {
+                              const parts = freq.split(' ');
+                              if (parts.length >= 2) {
+                                setRepeatInterval(parts[0]);
+                                const u = parts[1];
+                                setRepeatUnit(u.charAt(0).toUpperCase() + u.slice(1).toLowerCase());
+                                if (!u.endsWith('s')) {
+                                  // basic check for plural
+                                  setRepeatUnit(u.charAt(0).toUpperCase() + u.slice(1).toLowerCase() + (u.toLowerCase() === 'year' || u.toLowerCase() === 'month' || u.toLowerCase() === 'week' || u.toLowerCase() === 'day' ? 's' : ''));
+                                }
+                              }
+                            }}
                           >
-                            {u}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
+                            <Text style={styles.quickFreqChipText}>{freq}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
                     </View>
                   )}
-                </View>
-              </View>
 
-              {freqChain.length > 0 && (
-                <View style={styles.quickFreqContainer}>
-                  <Text style={styles.quickFreqLabel}>Quick Select</Text>
-                  <View style={styles.quickFreqGrid}>
-                    {freqChain.slice(0, 8).map((freq) => (
+                  <View style={styles.dateRow}>
+                    <Text style={styles.freqLabel}>Starts</Text>
+                    <View style={styles.dateInputWrapper}>
+                      <TextInput
+                        style={styles.dateInput}
+                        value={startDate}
+                        onChangeText={onTypeDate}
+                        placeholder="YYYY-MM-DD"
+                        placeholderTextColor="#9ca3af"
+                      />
                       <TouchableOpacity
-                        key={freq}
-                        style={styles.quickFreqChip}
-                        onPress={() => {
-                          const parts = freq.split(' ');
-                          if (parts.length >= 2) {
-                            setRepeatInterval(parts[0]);
-                            const u = parts[1];
-                            setRepeatUnit(u.charAt(0).toUpperCase() + u.slice(1).toLowerCase());
-                            if (!u.endsWith('s')) {
-                              // basic check for plural
-                              setRepeatUnit(u.charAt(0).toUpperCase() + u.slice(1).toLowerCase() + (u.toLowerCase() === 'year' || u.toLowerCase() === 'month' || u.toLowerCase() === 'week' || u.toLowerCase() === 'day' ? 's' : ''));
-                            }
-                          }
-                        }}
+                        style={styles.calendarTrigger}
+                        onPress={() => setShowDatePicker(true)}
                       >
-                        <Text style={styles.quickFreqChipText}>{freq}</Text>
+                        <CalendarIcon size={18} color={COLORS.primary} />
                       </TouchableOpacity>
-                    ))}
+                    </View>
                   </View>
-                </View>
-              )}
 
-              <View style={styles.dateRow}>
-                <Text style={styles.freqLabel}>Starts</Text>
-                <View style={styles.dateInputWrapper}>
-                  <TextInput
-                    style={styles.dateInput}
-                    value={startDate}
-                    onChangeText={onTypeDate}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#9ca3af"
-                  />
-                  <TouchableOpacity
-                    style={styles.calendarTrigger}
-                    onPress={() => setShowDatePicker(true)}
-                  >
-                    <CalendarIcon size={18} color={COLORS.primary} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {showDatePicker && (
-                <DateTimePicker
-                  value={pickerDate}
-                  mode="date"
-                  display="default"
-                  onChange={handleDateChange}
-                />
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={pickerDate}
+                      mode="date"
+                      display="default"
+                      onChange={handleDateChange}
+                    />
+                  )}
+                </>
               )}
 
               <TouchableOpacity
