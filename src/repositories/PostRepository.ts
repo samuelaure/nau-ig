@@ -26,6 +26,7 @@ export interface Post {
   deleted_at?: string;
   instagram_user_id?: string;
   biography?: string;
+  sm2_repetition: number;
 }
 
 export const getDuePosts = async (tagFilter?: string | null): Promise<Post[]> => {
@@ -154,6 +155,16 @@ export const markPostAsReviewed = async (id: number, interval: number): Promise<
          sm2_repetition = sm2_repetition + 1
      WHERE id = ?`,
     [interval, id],
+  );
+};
+
+export const unmarkPostAsReviewed = async (id: number): Promise<void> => {
+  await runSql(
+    `UPDATE posts 
+     SET next_review_at = datetime('now'),
+         sm2_repetition = MAX(0, sm2_repetition - 1)
+     WHERE id = ?`,
+    [id],
   );
 };
 

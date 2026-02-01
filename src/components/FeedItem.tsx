@@ -34,6 +34,7 @@ import {
   User,
   RefreshCw,
   RotateCw,
+  Undo2,
 } from 'lucide-react-native';
 import { MediaCacheService } from '@/services/MediaCacheService';
 import { syncManager } from '@/services/SyncManager';
@@ -45,6 +46,7 @@ import {
   updatePostTitle,
   moveToTrash,
   resetPostForRedownload,
+  unmarkPostAsReviewed,
 } from '@/repositories/PostRepository';
 import { COLORS } from '@/constants';
 
@@ -201,13 +203,17 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
   };
 
   const handleReviewed = async () => {
-    if (isHistory || post.isProcessed === 0) return;
+    if (post.isProcessed === 0 && !isSimpleNote) return;
     setIsUpdating(true);
     try {
-      await markPostAsReviewed(post.id, draftInterval);
+      if (isHistory) {
+        await unmarkPostAsReviewed(post.id);
+      } else {
+        await markPostAsReviewed(post.id, draftInterval);
+      }
       onProcessed();
     } catch (e) {
-      console.error('Failed to mark as reviewed', e);
+      console.error('Failed to toggle review status', e);
     } finally {
       setIsUpdating(false);
     }
@@ -426,16 +432,16 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
             (post.isProcessed === 0 || (isSimpleNote && isHistory)) && styles.doneBtnLocked,
           ]}
           onPress={handleReviewed}
-          disabled={isUpdating || isHistory || (post.isProcessed === 0 && !isSimpleNote)}
+          disabled={isUpdating || (post.isProcessed === 0 && !isSimpleNote)}
         >
           {isUpdating ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : isHistory ? (
-            <CheckCircle2 size={18} color="#fff" />
+            <Undo2 size={18} color="#fff" />
           ) : (
             <Check size={18} color="#fff" strokeWidth={3} />
           )}
-          <Text style={styles.doneBtnText}>{isHistory ? 'Done' : 'Done'}</Text>
+          <Text style={styles.doneBtnText}>{isHistory ? 'Undo' : 'Done'}</Text>
         </TouchableOpacity>
 
         <View style={styles.rightActionsGroup}>
