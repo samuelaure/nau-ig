@@ -21,6 +21,7 @@ import {
   Settings,
   Tag as TagIcon,
   Plus,
+  Inbox,
 } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
@@ -39,11 +40,12 @@ import {
   Post,
   untrashPost,
   deletePost,
+  getUnscheduledPosts,
 } from '@/repositories/PostRepository';
 import { syncManager } from '@/services/SyncManager';
 import { COLORS } from '@/constants';
 
-type FeedTab = 'due' | 'reviewed' | 'trash';
+type FeedTab = 'due' | 'reviewed' | 'trash' | 'unscheduled';
 const { width } = Dimensions.get('window');
 
 export const FeedScreen = () => {
@@ -81,6 +83,8 @@ export const FeedScreen = () => {
         data = await getReviewedPosts(selectedTag);
       } else if (activeTab === 'trash') {
         data = await getDeletedPosts();
+      } else if (activeTab === 'unscheduled') {
+        data = await getUnscheduledPosts(selectedTag);
       }
       setPosts(data);
 
@@ -133,6 +137,8 @@ export const FeedScreen = () => {
         return 'History';
       case 'trash':
         return 'Trash';
+      case 'unscheduled':
+        return 'Backlog';
       default:
         return '9naŭ';
     }
@@ -205,6 +211,21 @@ export const FeedScreen = () => {
               History
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.sidebarItem, activeTab === 'unscheduled' && styles.sidebarItemActive]}
+            onPress={() => handleTabChange('unscheduled')}
+          >
+            <Inbox size={22} color={activeTab === 'unscheduled' ? COLORS.secondary : '#4b5563'} />
+            <Text
+              style={[
+                styles.sidebarItemText,
+                activeTab === 'unscheduled' && { color: COLORS.secondary, fontWeight: '800' },
+              ]}
+            >
+              Backlog
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.sidebarFooter}>
@@ -234,16 +255,16 @@ export const FeedScreen = () => {
             <Text style={styles.sidebarItemText}>Settings</Text>
           </TouchableOpacity>
         </View>
-      </Animated.View>
+      </Animated.View >
 
       {/* Top Bar */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
+      < View style={[styles.topBar, { paddingTop: insets.top + 10 }]} >
         <TouchableOpacity style={styles.topBarSide} onPress={toggleSidebar}>
           <Menu size={24} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.logo}>{getHeaderTitle()}</Text>
         <View style={styles.topBarSide} />
-      </View>
+      </View >
 
       {activeTab !== 'trash' && availableTags.length > 0 && (
         <View style={styles.tagBarContainer}>
@@ -280,92 +301,100 @@ export const FeedScreen = () => {
         </View>
       )}
 
-      {activeTab === 'trash' ? (
-        <FlatList
-          key="trash-list"
-          data={posts}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.trashCard}>
-              <View style={styles.trashInfo}>
-                <Text style={styles.trashTitle}>{item.title || 'Untitled Capture'}</Text>
-                <Text style={styles.trashDate}>Deleted on {item.deleted_at}</Text>
+      {
+        activeTab === 'trash' ? (
+          <FlatList
+            key="trash-list"
+            data={posts}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
+              <View style={styles.trashCard}>
+                <View style={styles.trashInfo}>
+                  <Text style={styles.trashTitle}>{item.title || 'Untitled Capture'}</Text>
+                  <Text style={styles.trashDate}>Deleted on {item.deleted_at}</Text>
+                </View>
+                <View style={styles.trashActions}>
+                  <TouchableOpacity style={styles.untrashBtn} onPress={() => handleUntrash(item.id)}>
+                    <RotateCcw size={18} color="#16a34a" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.permaDeleteBtn}
+                    onPress={() => handlePermanentDelete(item.id)}
+                  >
+                    <Trash size={18} color="#dc2626" />
+                  </TouchableOpacity>
+                </View>
               </View>
-              <View style={styles.trashActions}>
-                <TouchableOpacity style={styles.untrashBtn} onPress={() => handleUntrash(item.id)}>
-                  <RotateCcw size={18} color="#16a34a" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.permaDeleteBtn}
-                  onPress={() => handlePermanentDelete(item.id)}
-                >
-                  <Trash size={18} color="#dc2626" />
-                </TouchableOpacity>
+            )}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Trash2 size={48} color="#e2e8f0" />
+                <Text style={styles.emptyText}>Trash is empty</Text>
               </View>
-            </View>
-          )}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Trash2 size={48} color="#e2e8f0" />
-              <Text style={styles.emptyText}>Trash is empty</Text>
-            </View>
-          }
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        />
-      ) : (
-        <FlatList
-          key="feed-list"
-          data={posts}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <FeedItem
-              post={item}
-              onProcessed={loadFeed}
-              isHistory={activeTab === 'reviewed'}
-              isVisible={viewableItems.has(item.id)}
-            />
-          )}
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <LayoutGrid size={48} color="#e2e8f0" />
-              <Text style={styles.emptyText}>No captures yet</Text>
-              <Text style={styles.emptySubText}>
-                Share an Instagram post or Reel to Learning Loop to see it here.
-              </Text>
-            </View>
-          }
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        />
-      )}
+            }
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          />
+        ) : (
+          <FlatList
+            key="feed-list"
+            data={posts}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
+              <FeedItem
+                post={item}
+                onProcessed={loadFeed}
+                isHistory={activeTab === 'reviewed'}
+                isVisible={viewableItems.has(item.id)}
+              />
+            )}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <LayoutGrid size={48} color="#e2e8f0" />
+                <Text style={styles.emptyText}>No captures yet</Text>
+                <Text style={styles.emptySubText}>
+                  Share an Instagram post or Reel to Learning Loop to see it here.
+                </Text>
+              </View>
+            }
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          />
+        )
+      }
 
-      {settingsVisible && (
-        <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
-      )}
+      {
+        settingsVisible && (
+          <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
+        )
+      }
 
-      {manualCaptureVisible && (
-        <CaptureModal
-          shareValue=""
-          onClose={() => {
-            setManualCaptureVisible(false);
-            loadFeed();
-          }}
-          isShareIntent={false}
-        />
-      )}
+      {
+        manualCaptureVisible && (
+          <CaptureModal
+            shareValue=""
+            onClose={() => {
+              setManualCaptureVisible(false);
+              loadFeed();
+            }}
+            isShareIntent={false}
+          />
+        )
+      }
 
       {/* Floating Action Button */}
-      {activeTab === 'due' && (
-        <TouchableOpacity
-          style={[styles.fab, { bottom: insets.bottom + 20 }]}
-          onPress={() => setManualCaptureVisible(true)}
-          activeOpacity={0.8}
-        >
-          <Plus size={28} color="#fff" />
-        </TouchableOpacity>
-      )}
-    </View>
+      {
+        activeTab === 'due' && (
+          <TouchableOpacity
+            style={[styles.fab, { bottom: insets.bottom + 20 }]}
+            onPress={() => setManualCaptureVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Plus size={28} color="#fff" />
+          </TouchableOpacity>
+        )
+      }
+    </View >
   );
 };
 
