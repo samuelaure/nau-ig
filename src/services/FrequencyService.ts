@@ -13,7 +13,7 @@ export const DEFAULT_FREQUENCY_CHAIN = [
 ];
 
 export const parseFrequencyToDays = (freq: string): number => {
-    if (!freq) return 1;
+    if (!freq) return 0;
     const parts = freq.trim().split(' ');
     const n = parseInt(parts[0]);
     if (isNaN(n)) return 1;
@@ -48,7 +48,7 @@ export const getFrequencyChain = async (): Promise<string[]> => {
 };
 
 export const formatDaysToFrequency = (days: number): string => {
-    if (days === 0) return '0 days';
+    if (days === 0) return 'Unscheduled';
     if (days % 365 === 0) return `${days / 365} year${days / 365 > 1 ? 's' : ''}`;
     if (days % 30 === 0) return `${days / 30} month${days / 30 > 1 ? 's' : ''}`;
     if (days % 7 === 0) return `${days / 7} week${days / 7 > 1 ? 's' : ''}`;

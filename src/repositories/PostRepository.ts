@@ -31,7 +31,7 @@ export interface Post {
 }
 
 export const getDuePosts = async (tagFilter?: string | null): Promise<Post[]> => {
-  let query = `SELECT * FROM posts WHERE is_deleted = 0 AND (next_review_at <= datetime('now') OR next_review_at IS NULL)`;
+  let query = `SELECT * FROM posts WHERE is_deleted = 0 AND sm2_interval > 0 AND (next_review_at <= datetime('now') OR next_review_at IS NULL)`;
   const params: any[] = [];
 
   if (tagFilter) {
@@ -53,6 +53,19 @@ export const getReviewedPosts = async (tagFilter?: string | null): Promise<Post[
   }
 
   query += ` ORDER BY next_review_at DESC`;
+  return executeSql<Post>(query, params);
+};
+
+export const getUnscheduledPosts = async (tagFilter?: string | null): Promise<Post[]> => {
+  let query = `SELECT * FROM posts WHERE is_deleted = 0 AND (sm2_interval = 0 OR sm2_interval IS NULL)`;
+  const params: any[] = [];
+
+  if (tagFilter) {
+    query += ` AND tags LIKE ?`;
+    params.push(`%${tagFilter}%`);
+  }
+
+  query += ` ORDER BY id DESC`;
   return executeSql<Post>(query, params);
 };
 
