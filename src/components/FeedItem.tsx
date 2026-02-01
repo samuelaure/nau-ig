@@ -32,8 +32,11 @@ import {
   Check,
   StickyNote,
   User,
+  RefreshCw,
+  RotateCw,
 } from 'lucide-react-native';
 import { MediaCacheService } from '@/services/MediaCacheService';
+import { syncManager } from '@/services/SyncManager';
 import {
   Post,
   MediaItem,
@@ -41,6 +44,7 @@ import {
   updatePostNote,
   updatePostTitle,
   moveToTrash,
+  resetPostForRedownload,
 } from '@/repositories/PostRepository';
 import { COLORS } from '@/constants';
 
@@ -57,7 +61,9 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [isUpdating, setIsUpdating] = useState(false);
+  const [retrySeed, setRetrySeed] = useState(0);
 
   // Unified Editing Mode
   const [isEditing, setIsEditing] = useState(false);
@@ -118,7 +124,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
       if (post.tags) {
         try {
           setTags(JSON.parse(post.tags));
-        } catch (e) {}
+        } catch (e) { }
       }
 
       if (!post.mediaData || post.isProcessed === 0) {
@@ -152,7 +158,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
       }
     };
     prepareMedia();
-  }, [post.mediaData, post.isProcessed, post.tags, pulseAnim]);
+  }, [post.mediaData, post.isProcessed, post.tags, pulseAnim, retrySeed]);
 
   const handlePersist = useCallback(async () => {
     let hasChanged = false;
@@ -202,6 +208,27 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
       onProcessed();
     } catch (e) {
       console.error('Failed to mark as reviewed', e);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleReRender = () => {
+    setLoading(true);
+    setMedia([]); // Clear current media to force fresh render
+    setRetrySeed((prev) => prev + 1);
+    setMenuVisible(false);
+  };
+
+  const handleReDownload = async () => {
+    try {
+      setIsUpdating(true);
+      await resetPostForRedownload(post.id);
+      syncManager.triggerSync(); // Trigger sync immediately
+      onProcessed(); // Refresh parent to show loading state
+      setMenuVisible(false);
+    } catch (e) {
+      console.error('Failed to trigger re-download', e);
     } finally {
       setIsUpdating(false);
     }
@@ -308,6 +335,22 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
                 {isConfirmingDelete ? 'Are you sure?' : 'Delete'}
               </Text>
             </TouchableOpacity>
+            {!isConfirmingDelete && (
+              <>
+                <TouchableOpacity style={styles.menuItem} onPress={handleReRender}>
+                  <View style={styles.menuItemContent}>
+                    <RefreshCw size={16} color="#525252" />
+                    <Text style={styles.menuItemTextNormal}>Re-render</Text>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={handleReDownload}>
+                  <View style={styles.menuItemContent}>
+                    <RotateCw size={16} color="#525252" />
+                    <Text style={styles.menuItemTextNormal}>Re-download</Text>
+                  </View>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         )}
       </View>
@@ -637,6 +680,16 @@ const styles = StyleSheet.create({
   },
   menuItemTextConfirm: {
     color: '#fff',
+  },
+  menuItemTextNormal: {
+    color: '#171717',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  menuItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   // 2. Media Carousel (0px)
   processingBox: {

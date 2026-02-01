@@ -104,6 +104,18 @@ export const resetSyncForManualRetry = async (ids: number[]): Promise<void> => {
   );
 };
 
+export const resetPostForRedownload = async (id: number): Promise<void> => {
+  await runSql(
+    `UPDATE posts 
+     SET isProcessed = 0, 
+         sync_status = 'pending', 
+         sync_attempts = 0, 
+         mediaData = NULL 
+     WHERE id = ?`,
+    [id],
+  );
+};
+
 export const getStandbyPosts = async (): Promise<Post[]> => {
   return executeSql<Post>(
     "SELECT * FROM posts WHERE sync_status = 'standby' OR sync_attempts >= 10",
