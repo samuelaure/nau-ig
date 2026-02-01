@@ -62,9 +62,10 @@ interface FeedItemProps {
   onProcessed: () => void;
   isHistory?: boolean;
   isVisible?: boolean;
+  onLabelClick?: (label: string) => void;
 }
 
-export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemProps) => {
+export const FeedItem = ({ post, onProcessed, isHistory, isVisible, onLabelClick }: FeedItemProps) => {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -573,9 +574,13 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
         {tags.length > 0 && (
           <View style={styles.labelPillsRow}>
             {tags.map((tag, idx) => (
-              <View key={idx} style={styles.pill}>
-                <Text style={styles.pillText}>#{tag}</Text>
-              </View>
+              <TouchableOpacity
+                key={idx}
+                style={styles.pill}
+                onPress={() => onLabelClick?.(tag)}
+              >
+                <Text style={styles.pillText}>{tag}</Text>
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -1009,21 +1014,21 @@ const styles = StyleSheet.create({
   labelPillsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 6,
+    gap: 6,
+    marginTop: 12,
   },
   pill: {
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderWidth: 0.5,
-    borderColor: '#e2e8f0',
+    borderColor: 'rgba(0,0,0,0.1)',
   },
   pillText: {
-    fontSize: 12,
-    color: '#475569',
-    fontWeight: '600',
+    color: '#3c4043',
+    fontSize: 11,
+    fontWeight: '500',
   },
   footerInfo: {
     marginTop: 20,

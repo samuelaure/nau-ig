@@ -29,7 +29,8 @@ import {
   Calendar as CalendarIcon,
   Check,
 } from 'lucide-react-native';
-import { savePost, getAllTags } from '@/repositories/PostRepository';
+import { savePost } from '@/repositories/PostRepository';
+import { getAllLabels, createLabel } from '@/repositories/LabelRepository';
 import { SYNC_POLLING_INTERVAL, COLORS } from '@/constants';
 import { getFrequencyChain } from '@/services/FrequencyService';
 import { syncManager } from '@/services/SyncManager';
@@ -110,11 +111,11 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
   }, []);
 
   const loadData = async () => {
-    const [tags, chain] = await Promise.all([
-      getAllTags(),
+    const [labels, chain] = await Promise.all([
+      getAllLabels(),
       getFrequencyChain(),
     ]);
-    setExistingTags(tags);
+    setExistingTags(labels.map(l => l.name));
     setFreqChain(chain);
   };
 
@@ -126,13 +127,14 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
     }
   };
 
-  const addNewTag = () => {
+  const addNewTag = async () => {
     const tag = newTag.trim();
     if (tag) {
       const existing = existingTags.find((t) => t.toLowerCase() === tag.toLowerCase());
       const tagToUse = existing || tag;
 
       if (!existing) {
+        await createLabel(tagToUse);
         setExistingTags([tagToUse, ...existingTags]);
       }
 
