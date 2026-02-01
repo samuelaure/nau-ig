@@ -29,9 +29,9 @@ import {
   Check,
 } from 'lucide-react-native';
 import { savePost, getAllTags } from '@/repositories/PostRepository';
-import { getSetting } from '@/repositories/SettingsRepository';
+import { SYNC_POLLING_INTERVAL, COLORS } from '@/constants';
+import { getFrequencyChain } from '@/services/FrequencyService';
 import { syncManager } from '@/services/SyncManager';
-import { COLORS } from '@/constants';
 
 interface CaptureModalProps {
   shareValue: string;
@@ -65,6 +65,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isFreqCustomized, setIsFreqCustomized] = useState(false);
+  const [freqChain, setFreqChain] = useState<string[]>([]);
 
   // Clean the URL if it comes with prefix text (common in Instagram shares)
   const [manualUrl, setManualUrl] = useState('');
@@ -91,7 +92,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
   const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
-    loadExistingTags();
+    loadData();
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -106,13 +107,16 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
     ]).start();
   }, []);
 
-  const loadExistingTags = async () => {
-    const tags = await getAllTags();
+  const loadData = async () => {
+    const [tags, chain] = await Promise.all([
+      getAllTags(),
+      getFrequencyChain(),
+    ]);
     setExistingTags(tags);
+    setFreqChain(chain);
   };
 
   const toggleTag = (tag: string) => {
-    // We already ensure existingTags match case, but let's be safe
     if (selectedTags.includes(tag)) {
       setSelectedTags(selectedTags.filter((t) => t !== tag));
     } else {
@@ -123,7 +127,6 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
   const addNewTag = () => {
     const tag = newTag.trim();
     if (tag) {
-      // Find case-insensitive match
       const existing = existingTags.find((t) => t.toLowerCase() === tag.toLowerCase());
       const tagToUse = existing || tag;
 
@@ -182,6 +185,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
       return;
     }
 
+    setIsSaving(true);
     try {
       const postData = {
         instagramUrl: finalUrl,
@@ -192,21 +196,16 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
         startDate: startDate,
       };
 
-      console.log('[CaptureModal] Attempting to savePost with:', postData);
-      const postId = await savePost(postData);
-      console.log('[CaptureModal] savePost success. postId:', postId);
+      await savePost(postData);
 
-      // Wake up the background sync manager to start downloading the new capture if there's a link
       if (finalUrl) {
         syncManager.triggerSync();
       }
 
-      console.log('[CaptureModal] Showing success toast');
       if (Platform.OS === 'android') {
         ToastAndroid.show('Capture Saved!', ToastAndroid.SHORT);
       }
 
-      console.log('[CaptureModal] Closing modal');
       handleClose();
     } catch (err) {
       console.error('[CaptureModal] CRITICAL SAVE ERROR:', err);
@@ -327,7 +326,8 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
             </View>
           )}
         </Animated.View>
-        {/* Tag Picker Modal (Nested) */}
+
+        {/* Tag Picker Modal */}
         <Modal
           visible={showTagPicker}
           transparent
@@ -384,7 +384,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
           </TouchableOpacity>
         </Modal>
 
-        {/* Frequency Picker Modal (Nested) */}
+        {/* Frequency Picker Modal */}
         <Modal
           visible={showFreqPicker}
           transparent
@@ -448,6 +448,34 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                   )}
                 </View>
               </View>
+
+              {freqChain.length > 0 && (
+                <View style={styles.quickFreqContainer}>
+                  <Text style={styles.quickFreqLabel}>Quick Select</Text>
+                  <View style={styles.quickFreqGrid}>
+                    {freqChain.slice(0, 8).map((freq) => (
+                      <TouchableOpacity
+                        key={freq}
+                        style={styles.quickFreqChip}
+                        onPress={() => {
+                          const parts = freq.split(' ');
+                          if (parts.length >= 2) {
+                            setRepeatInterval(parts[0]);
+                            const u = parts[1];
+                            setRepeatUnit(u.charAt(0).toUpperCase() + u.slice(1).toLowerCase());
+                            if (!u.endsWith('s')) {
+                              // basic check for plural
+                              setRepeatUnit(u.charAt(0).toUpperCase() + u.slice(1).toLowerCase() + (u.toLowerCase() === 'year' || u.toLowerCase() === 'month' || u.toLowerCase() === 'week' || u.toLowerCase() === 'day' ? 's' : ''));
+                            }
+                          }
+                        }}
+                      >
+                        <Text style={styles.quickFreqChipText}>{freq}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
 
               <View style={styles.dateRow}>
                 <Text style={styles.freqLabel}>Starts</Text>
@@ -635,7 +663,7 @@ const styles = StyleSheet.create({
   popupContent: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    maxHeight: '60%',
+    maxHeight: '80%',
     padding: 16,
     width: '85%',
     maxWidth: 340,
@@ -777,5 +805,34 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
+  },
+  quickFreqContainer: {
+    marginBottom: 20,
+  },
+  quickFreqLabel: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    letterSpacing: 0.5,
+  },
+  quickFreqGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  quickFreqChip: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  quickFreqChipText: {
+    fontSize: 12,
+    color: '#475569',
+    fontWeight: '600',
   },
 });

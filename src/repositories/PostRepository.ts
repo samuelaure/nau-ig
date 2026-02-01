@@ -1,24 +1,5 @@
 import { executeSql, runSql } from '../db';
-
-const parseFrequencyToDays = (freq: string): number => {
-  if (!freq) return 1;
-  const parts = freq.split(' ');
-  const n = parseInt(parts[0]);
-  if (isNaN(n)) return 1;
-  const unit = (parts[1] || 'days').toLowerCase();
-  switch (unit) {
-    case 'days':
-      return n;
-    case 'weeks':
-      return n * 7;
-    case 'months':
-      return n * 30;
-    case 'years':
-      return n * 365;
-    default:
-      return n;
-  }
-};
+import { parseFrequencyToDays, getNextFrequencyInterval } from '../services/FrequencyService';
 
 export interface MediaItem {
   type: 'image' | 'video';
@@ -146,14 +127,21 @@ export const getStandbyPosts = async (): Promise<Post[]> => {
 export const updatePostFrequency = async (
   id: number,
   direction: 'more' | 'less',
-): Promise<void> => {
+): Promise<number> => {
+  const posts = await executeSql<Post>('SELECT sm2_interval FROM posts WHERE id = ?', [id]);
+  if (posts.length === 0) return 1;
+
+  const currentInterval = posts[0].sm2_interval;
+  const nextInterval = await getNextFrequencyInterval(currentInterval, direction);
+
   await runSql(
     `UPDATE posts 
-     SET sm2_interval = CASE WHEN ? = 'more' THEN MAX(1, sm2_interval / 2) ELSE sm2_interval * 2 END,
-         next_review_at = datetime('now', '+' || (CASE WHEN ? = 'more' THEN MAX(1, sm2_interval / 2) ELSE sm2_interval * 2 END) || ' days')
+     SET sm2_interval = ?,
+         next_review_at = datetime('now', '+' || ? || ' days')
      WHERE id = ?`,
-    [direction, direction, id],
+    [nextInterval, nextInterval, id],
   );
+  return nextInterval;
 };
 
 export const updatePostNote = async (id: number, content: string): Promise<void> => {

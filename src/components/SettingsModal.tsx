@@ -10,10 +10,11 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { X, Globe, Database, Trash2, RefreshCcw } from 'lucide-react-native';
+import { X, Globe, Database, Trash2, RefreshCcw, Clock } from 'lucide-react-native';
 import { getSetting, setSetting } from '@/repositories/SettingsRepository';
 import { getStandbyPosts, resetSyncForManualRetry } from '@/repositories/PostRepository';
 import { SYNC_POLLING_INTERVAL, COLORS } from '@/constants';
+import { DEFAULT_FREQUENCY_CHAIN } from '@/services/FrequencyService';
 import { syncManager } from '@/services/SyncManager';
 import { MediaCacheService } from '@/services/MediaCacheService';
 
@@ -24,6 +25,7 @@ interface SettingsModalProps {
 
 export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
   const [apifyToken, setApifyToken] = useState('');
+  const [frequencyChain, setFrequencyChain] = useState('');
   const [isClearing, setIsClearing] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
   const [standbyCount, setStandbyCount] = useState(0);
@@ -40,12 +42,14 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
   useEffect(() => {
     if (visible) {
       getSetting('apify_api_token').then((val) => setApifyToken(val || ''));
+      getSetting('frequency_chain').then((val) => setFrequencyChain(val || DEFAULT_FREQUENCY_CHAIN.join(', ')));
       loadStandbyCount();
     }
   }, [visible]);
 
   const handleSave = async () => {
     await setSetting('apify_api_token', apifyToken);
+    await setSetting('frequency_chain', frequencyChain);
     onClose();
   };
 
@@ -147,6 +151,24 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
                   secureTextEntry
                 />
               </View>
+
+              <View style={styles.sectionDivider} />
+              <Text style={styles.label}>Frequency Levels Chain</Text>
+              <View style={[styles.inputContainer, styles.textAreaContainer]}>
+                <Clock size={18} color="#9ca3af" style={[styles.inputIcon, { marginTop: 12 }]} />
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="1 day, 2 days, 1 week..."
+                  value={frequencyChain}
+                  onChangeText={setFrequencyChain}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+              <Text style={styles.helpText}>
+                Define the levels for "More" and "Less" buttons. Must be in increasing order.
+                Units: days, weeks, months, years.
+              </Text>
 
               {/* Storage Settings */}
               <View style={styles.sectionDivider} />
@@ -269,6 +291,14 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     paddingVertical: 12,
+    color: '#111827',
+  },
+  textAreaContainer: {
+    alignItems: 'flex-start',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
   },
   sectionDivider: {
     backgroundColor: '#f3f4f6',

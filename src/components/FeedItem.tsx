@@ -38,6 +38,7 @@ import {
 } from 'lucide-react-native';
 import { MediaCacheService } from '@/services/MediaCacheService';
 import { syncManager } from '@/services/SyncManager';
+import { formatDaysToFrequency } from '@/services/FrequencyService';
 import {
   Post,
   MediaItem,
@@ -193,25 +194,17 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
     };
   }, [titleDraft, noteDraft, isEditing, handlePersist]);
 
-  const handleUpdateFrequency = (direction: 'more' | 'less') => {
-    setDraftInterval((prev) => {
-      const next = direction === 'more' ? Math.max(1, Math.round(prev / 2)) : prev * 2;
-
-      if (freqSaveTimeout.current) clearTimeout(freqSaveTimeout.current);
-      freqSaveTimeout.current = setTimeout(async () => {
-        setIsUpdating(true);
-        try {
-          await updatePostInterval(post.id, next);
-          onProcessed();
-        } catch (e) {
-          console.error('Failed to update frequency', e);
-        } finally {
-          setIsUpdating(false);
-        }
-      }, 1500);
-
-      return next;
-    });
+  const handleUpdateFrequency = async (direction: 'more' | 'less') => {
+    setIsUpdating(true);
+    try {
+      const next = await updatePostFrequency(post.id, direction);
+      setDraftInterval(next);
+      onProcessed();
+    } catch (e) {
+      console.error('Failed to update frequency', e);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleReviewed = async () => {
@@ -457,7 +450,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
         <View style={styles.rightActionsGroup}>
           <View style={styles.freqDisplayContainer}>
             <Text style={styles.freqLabel}>
-              {draftInterval}d
+              {formatDaysToFrequency(draftInterval)}
             </Text>
           </View>
 
@@ -565,7 +558,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
 
         <View style={styles.footerInfo}>
           <Text style={styles.reviewTimeline}>
-            {isHistory ? 'Next review in' : 'Review due in'} {post.sm2_interval} days
+            {isHistory ? 'Next review in' : 'Review due in'} {formatDaysToFrequency(post.sm2_interval)}
           </Text>
         </View>
       </View>
