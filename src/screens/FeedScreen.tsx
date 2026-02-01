@@ -22,6 +22,7 @@ import {
   Tag as TagIcon,
   Plus,
   Inbox,
+  Pencil,
 } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
@@ -32,6 +33,7 @@ import Animated, {
 import { FeedItem } from '@/components/FeedItem';
 import { SettingsModal } from '@/components/SettingsModal';
 import { CaptureModal } from '@/components/CaptureModal';
+import { LabelManagementModal } from '@/components/LabelManagementModal';
 import {
   getDuePosts,
   getReviewedPosts,
@@ -41,11 +43,13 @@ import {
   untrashPost,
   deletePost,
   getUnscheduledPosts,
+  getPostsByTag,
 } from '@/repositories/PostRepository';
+import { Label, getAllLabels } from '@/repositories/LabelRepository';
 import { syncManager } from '@/services/SyncManager';
 import { COLORS } from '@/constants';
 
-type FeedTab = 'due' | 'reviewed' | 'trash' | 'unscheduled';
+type FeedTab = 'due' | 'reviewed' | 'trash' | 'unscheduled' | 'label';
 const { width } = Dimensions.get('window');
 
 export const FeedScreen = () => {
@@ -59,6 +63,8 @@ export const FeedScreen = () => {
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [viewableItems, setViewableItems] = useState<Set<number>>(new Set());
   const [manualCaptureVisible, setManualCaptureVisible] = useState(false);
+  const [labels, setLabels] = useState<Label[]>([]);
+  const [labelsModalVisible, setLabelsModalVisible] = useState(false);
 
   // Animation values for Sidebar
   const sidebarOffset = useSharedValue(-width * 0.85);
@@ -85,11 +91,14 @@ export const FeedScreen = () => {
         data = await getDeletedPosts();
       } else if (activeTab === 'unscheduled') {
         data = await getUnscheduledPosts(selectedTag);
+      } else if (activeTab === 'label' && selectedTag) {
+        data = await getPostsByTag(selectedTag);
       }
       setPosts(data);
 
-      const tags = await getAllTags();
+      const [tags, allLabels] = await Promise.all([getAllTags(), getAllLabels()]);
       setAvailableTags(tags);
+      setLabels(allLabels);
     } catch (error) {
       console.error('Failed to load feed:', error);
     }
@@ -114,10 +123,6 @@ export const FeedScreen = () => {
     setRefreshing(false);
   };
 
-  const handleTabChange = (tab: FeedTab) => {
-    setActiveTab(tab);
-    toggleSidebar();
-  };
 
   const handleUntrash = async (id: number) => {
     await untrashPost(id);
@@ -139,9 +144,25 @@ export const FeedScreen = () => {
         return 'Trash';
       case 'unscheduled':
         return 'Backlog';
+      case 'label':
+        return selectedTag || 'Label';
       default:
         return '9naŭ';
     }
+  };
+
+  const handleLabelSelect = (labelName: string) => {
+    setSelectedTag(labelName);
+    setActiveTab('label');
+    toggleSidebar();
+  };
+
+  const handleTabChange = (tab: FeedTab) => {
+    setActiveTab(tab);
+    if (tab !== 'label') {
+      setSelectedTag(null);
+    }
+    toggleSidebar();
   };
 
   // Reanimated Styles
@@ -226,6 +247,50 @@ export const FeedScreen = () => {
               Backlog
             </Text>
           </TouchableOpacity>
+
+          <View style={styles.sidebarDivider} />
+          <View style={styles.sidebarSectionHeader}>
+            <Text style={styles.sidebarSectionTitle}>LABELS</Text>
+          </View>
+
+          {labels.map((label) => (
+            <TouchableOpacity
+              key={label.id}
+              style={[
+                styles.sidebarItem,
+                activeTab === 'label' && selectedTag === label.name && styles.sidebarItemActive,
+              ]}
+              onPress={() => handleLabelSelect(label.name)}
+            >
+              <TagIcon
+                size={22}
+                color={
+                  activeTab === 'label' && selectedTag === label.name ? COLORS.secondary : '#4b5563'
+                }
+              />
+              <Text
+                style={[
+                  styles.sidebarItemText,
+                  activeTab === 'label' &&
+                  selectedTag === label.name && { color: COLORS.secondary, fontWeight: '800' },
+                ]}
+              >
+                {label.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+
+          <TouchableOpacity
+            style={styles.sidebarItem}
+            onPress={() => {
+              setLabelsModalVisible(true);
+              toggleSidebar();
+            }}
+          >
+            <Pencil size={22} color="#4b5563" />
+            <Text style={styles.sidebarItemText}>Edit labels</Text>
+          </TouchableOpacity>
+          <View style={styles.sidebarDivider} />
         </View>
 
         <View style={styles.sidebarFooter}>
@@ -345,6 +410,7 @@ export const FeedScreen = () => {
                 onProcessed={loadFeed}
                 isHistory={activeTab === 'reviewed'}
                 isVisible={viewableItems.has(item.id)}
+                onLabelClick={handleLabelSelect}
               />
             )}
             onViewableItemsChanged={onViewableItemsChanged}
@@ -392,6 +458,16 @@ export const FeedScreen = () => {
           >
             <Plus size={28} color="#fff" />
           </TouchableOpacity>
+        )
+      }
+
+      {
+        labelsModalVisible && (
+          <LabelManagementModal
+            visible={labelsModalVisible}
+            onClose={() => setLabelsModalVisible(false)}
+            onLabelsChanged={loadFeed}
+          />
         )
       }
     </View >
@@ -466,6 +542,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#4b5563',
+    flex: 1,
+  },
+  sidebarDivider: {
+    height: 1,
+    backgroundColor: '#f3f4f6',
+    marginVertical: 8,
+  },
+  sidebarSectionHeader: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  sidebarSectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#9ca3af',
+    letterSpacing: 0.5,
   },
   sidebarFooter: {
     borderTopWidth: 1,
