@@ -374,6 +374,12 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                   );
                 })}
               </ScrollView>
+              <TouchableOpacity
+                style={[styles.doneBtn, { marginTop: 12 }]}
+                onPress={() => setShowTagPicker(false)}
+              >
+                <Text style={styles.doneBtnText}>OK</Text>
+              </TouchableOpacity>
             </View>
           </TouchableOpacity>
         </Modal>
