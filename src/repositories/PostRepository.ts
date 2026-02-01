@@ -1,5 +1,25 @@
 import { executeSql, runSql } from '../db';
 
+const parseFrequencyToDays = (freq: string): number => {
+  if (!freq) return 1;
+  const parts = freq.split(' ');
+  const n = parseInt(parts[0]);
+  if (isNaN(n)) return 1;
+  const unit = (parts[1] || 'days').toLowerCase();
+  switch (unit) {
+    case 'days':
+      return n;
+    case 'weeks':
+      return n * 7;
+    case 'months':
+      return n * 30;
+    case 'years':
+      return n * 365;
+    default:
+      return n;
+  }
+};
+
 export interface MediaItem {
   type: 'image' | 'video';
   url: string;
@@ -140,6 +160,16 @@ export const updatePostNote = async (id: number, content: string): Promise<void>
   await runSql('UPDATE posts SET content = ? WHERE id = ?', [content, id]);
 };
 
+export const updatePostInterval = async (id: number, interval: number): Promise<void> => {
+  await runSql(
+    `UPDATE posts 
+     SET sm2_interval = ?,
+         next_review_at = datetime('now', '+' || ? || ' days')
+     WHERE id = ?`,
+    [interval, interval, id],
+  );
+};
+
 export const updatePostTitle = async (id: number, title: string): Promise<void> => {
   await runSql('UPDATE posts SET title = ? WHERE id = ?', [title, id]);
 };
@@ -238,15 +268,18 @@ export const getProfileByUsername = async (
 
 export const savePost = async (post: any): Promise<number> => {
   const isProcessed = post.instagramUrl ? 0 : 1;
+  const initialInterval = parseFrequencyToDays(post.frequency);
+
   return runSql(
     `INSERT INTO posts (instagramUrl, title, content, tags, frequency, sm2_interval, isProcessed, next_review_at, sync_status) 
-     VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       post.instagramUrl || '',
       post.title,
       post.content,
       JSON.stringify(post.tags),
       post.frequency,
+      initialInterval,
       isProcessed,
       post.startDate || new Date().toISOString().split('T')[0],
       isProcessed ? 'processed' : 'pending',

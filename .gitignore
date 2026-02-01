@@ -61,3 +61,6 @@ coverage/
 
 # Testing
 __tests__/__snapshots__/
+
+# Anti-bloat / Commits
+commit_msg.txt

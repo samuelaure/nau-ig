@@ -47,6 +47,8 @@ import {
   moveToTrash,
   resetPostForRedownload,
   unmarkPostAsReviewed,
+  updatePostFrequency,
+  updatePostInterval,
 } from '@/repositories/PostRepository';
 import { COLORS } from '@/constants';
 
@@ -72,9 +74,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
   const [titleDraft, setTitleDraft] = useState(post.title || '');
   const [noteDraft, setNoteDraft] = useState(post.content || '');
   const [showOriginalCaption, setShowOriginalCaption] = useState(false);
-
-  // Frequency Stage State (Local only until committed)
-  const [draftInterval, setDraftInterval] = useState(post.sm2_interval || 1);
+  const [draftInterval, setDraftInterval] = useState(post.sm2_interval);
 
   // Menu State
   const [menuVisible, setMenuVisible] = useState(false);
@@ -86,6 +86,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
 
   const doubleTapRef = useRef(null);
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
+  const freqSaveTimeout = useRef<NodeJS.Timeout | null>(null);
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
 
   // Track if we need to blur properly
@@ -98,7 +99,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
     if (!isEditing) {
       setTitleDraft(post.title || '');
       setNoteDraft(post.content || '');
-      setDraftInterval(post.sm2_interval || 1);
+      setDraftInterval(post.sm2_interval);
     }
   }, [post.title, post.content, post.sm2_interval, isEditing]);
 
@@ -192,14 +193,25 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
     };
   }, [titleDraft, noteDraft, isEditing, handlePersist]);
 
-  const handleIntervalDraft = (direction: 'up' | 'down') => {
-    if (direction === 'down') {
-      // Study more often = interval gets smaller
-      setDraftInterval((prev) => Math.max(1, Math.round(prev / 2)));
-    } else {
-      // Study less often = interval gets larger
-      setDraftInterval((prev) => prev * 2);
-    }
+  const handleUpdateFrequency = (direction: 'more' | 'less') => {
+    setDraftInterval((prev) => {
+      const next = direction === 'more' ? Math.max(1, Math.round(prev / 2)) : prev * 2;
+
+      if (freqSaveTimeout.current) clearTimeout(freqSaveTimeout.current);
+      freqSaveTimeout.current = setTimeout(async () => {
+        setIsUpdating(true);
+        try {
+          await updatePostInterval(post.id, next);
+          onProcessed();
+        } catch (e) {
+          console.error('Failed to update frequency', e);
+        } finally {
+          setIsUpdating(false);
+        }
+      }, 1500);
+
+      return next;
+    });
   };
 
   const handleReviewed = async () => {
@@ -291,8 +303,6 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
       }
     }, 100);
   };
-
-  const isDrafed = draftInterval !== post.sm2_interval;
 
   return (
     <View style={styles.container}>
@@ -446,15 +456,9 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
 
         <View style={styles.rightActionsGroup}>
           <View style={styles.freqDisplayContainer}>
-            <Text style={[styles.freqLabel, isDrafed && styles.freqLabelStale]}>
-              {post.sm2_interval}d
+            <Text style={styles.freqLabel}>
+              {draftInterval}d
             </Text>
-            {isDrafed && (
-              <>
-                <Text style={styles.freqArrow}>→</Text>
-                <Text style={styles.freqLabelNew}>{draftInterval}d</Text>
-              </>
-            )}
           </View>
 
           <View style={styles.divider} />
@@ -462,7 +466,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
           <View style={styles.stepControls}>
             <TouchableOpacity
               style={styles.stepBtnIcon}
-              onPress={() => handleIntervalDraft('down')}
+              onPress={() => handleUpdateFrequency('more')}
               disabled={isUpdating}
             >
               <ChevronDown size={22} color="#64748b" />
@@ -470,7 +474,7 @@ export const FeedItem = ({ post, onProcessed, isHistory, isVisible }: FeedItemPr
 
             <TouchableOpacity
               style={styles.stepBtnIcon}
-              onPress={() => handleIntervalDraft('up')}
+              onPress={() => handleUpdateFrequency('less')}
               disabled={isUpdating}
             >
               <ChevronUp size={22} color="#64748b" />
@@ -820,27 +824,6 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 8,
   },
-  freqLabelStale: {
-    color: '#94a3b8',
-    textDecorationLine: 'line-through',
-    backgroundColor: 'transparent',
-  },
-  freqArrow: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '700',
-  },
-  freqLabelNew: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: COLORS.secondary,
-    backgroundColor: '#f5f3ff',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e7ff',
-  },
   divider: {
     width: 1,
     height: 24,
@@ -957,6 +940,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 });
+
 // --- Instagram Video Component ---
 
 const InstagramVideo = ({
