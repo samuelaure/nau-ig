@@ -10,7 +10,7 @@ import {
     KeyboardAvoidingView,
     Platform,
 } from 'react-native';
-import { Plus, Check, Pencil, Trash2, Tag, X } from 'lucide-react-native';
+import { Check, Pencil, Trash2, Tag, X } from 'lucide-react-native';
 import { Label, getAllLabels, createLabel, updateLabel, deleteLabel } from '@/repositories/LabelRepository';
 import { COLORS } from '@/constants';
 
@@ -88,7 +88,7 @@ export const LabelManagementModal: React.FC<LabelManagementModalProps> = ({
                         {/* Create New Label */}
                         <View style={styles.row}>
                             <TouchableOpacity onPress={() => setNewLabelName('')} style={styles.iconBtn}>
-                                <X size={20} color={newLabelName ? '#5f6368' : '#e0e0e0'} />
+                                <X size={20} color={newLabelName ? COLORS.textSecondary : '#e0e0e0'} />
                             </TouchableOpacity>
                             <TextInput
                                 style={styles.input}
@@ -107,11 +107,11 @@ export const LabelManagementModal: React.FC<LabelManagementModalProps> = ({
                                 <View key={label.id} style={styles.row}>
                                     {editingLabelId === label.id ? (
                                         <TouchableOpacity onPress={() => handleDelete(label.id)} style={styles.iconBtn}>
-                                            <Trash2 size={20} color="#5f6368" />
+                                            <Trash2 size={20} color={COLORS.textSecondary} />
                                         </TouchableOpacity>
                                     ) : (
                                         <View style={styles.iconBtn}>
-                                            <Tag size={20} color="#5f6368" />
+                                            <Tag size={20} color={COLORS.textSecondary} />
                                         </View>
                                     )}
 
@@ -138,7 +138,7 @@ export const LabelManagementModal: React.FC<LabelManagementModalProps> = ({
                                             }}
                                             style={styles.iconBtn}
                                         >
-                                            <Pencil size={20} color="#5f6368" />
+                                            <Pencil size={20} color={COLORS.textSecondary} />
                                         </TouchableOpacity>
                                     )}
                                 </View>
@@ -158,70 +158,70 @@ export const LabelManagementModal: React.FC<LabelManagementModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-    overlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
     container: {
-        width: '90%',
-        maxWidth: 400,
-        backgroundColor: '#fff',
+        backgroundColor: COLORS.background,
         borderRadius: 8,
+        maxWidth: 400,
         overflow: 'hidden',
+        width: '90%',
     },
     content: {
         padding: 16,
-    },
-    title: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#202124',
-        marginBottom: 20,
-        paddingHorizontal: 8,
-    },
-    row: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        height: 48,
-        marginBottom: 8,
-    },
-    iconBtn: {
-        width: 48,
-        height: 48,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    input: {
-        flex: 1,
-        fontSize: 16,
-        color: '#3c4043',
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: 'transparent',
-    },
-    inputEditing: {
-        borderBottomColor: '#e0e0e0',
-    },
-    labelList: {
-        maxHeight: 300,
-        marginTop: 8,
-    },
-    footer: {
-        borderTopWidth: 1,
-        borderTopColor: '#f1f3f4',
-        paddingTop: 12,
-        alignItems: 'flex-end',
-        marginTop: 12,
     },
     doneBtn: {
         paddingHorizontal: 24,
         paddingVertical: 10,
     },
     doneBtnText: {
+        color: COLORS.dark,
         fontSize: 14,
         fontWeight: '700',
-        color: '#202124',
+    },
+    footer: {
+        alignItems: 'flex-end',
+        borderTopColor: COLORS.border,
+        borderTopWidth: 1,
+        marginTop: 12,
+        paddingTop: 12,
+    },
+    iconBtn: {
+        alignItems: 'center',
+        height: 48,
+        justifyContent: 'center',
+        width: 48,
+    },
+    input: {
+        borderBottomColor: 'transparent',
+        borderBottomWidth: 1,
+        color: COLORS.dark,
+        flex: 1,
+        fontSize: 16,
+        paddingVertical: 8,
+    },
+    inputEditing: {
+        borderBottomColor: COLORS.border,
+    },
+    labelList: {
+        marginTop: 8,
+        maxHeight: 300,
+    },
+    overlay: {
+        alignItems: 'center',
+        backgroundColor: COLORS.overlay,
+        flex: 1,
+        justifyContent: 'center',
+    },
+    row: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        height: 48,
+        marginBottom: 8,
+    },
+    title: {
+        color: COLORS.dark,
+        fontSize: 18,
+        fontWeight: '700',
+        marginBottom: 20,
+        paddingHorizontal: 8,
     },
 });

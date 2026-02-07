@@ -88,7 +88,7 @@ const migrations: Migration[] = [
 export const applyMigrations = async () => {
   // 1. Get current version
   const result = await executeSql<{ user_version: number }>('PRAGMA user_version');
-  let currentVersion = result[0]?.user_version || 0;
+  const currentVersion = result[0]?.user_version || 0;
 
   console.log(`[DB] Current version: ${currentVersion}`);
 
