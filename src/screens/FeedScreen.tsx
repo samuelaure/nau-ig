@@ -23,6 +23,7 @@ import {
   Tag as TagIcon,
   Plus,
   Inbox,
+  Archive,
   Pencil,
 } from 'lucide-react-native';
 import Animated, {
@@ -210,7 +211,7 @@ export const FeedScreen = () => {
       case 'trash':
         return 'Trash';
       case 'unscheduled':
-        return 'Backlog';
+        return 'Archive';
       case 'label':
         return selectedTag || 'Label';
       default:
@@ -315,14 +316,14 @@ export const FeedScreen = () => {
             style={[styles.sidebarItem, activeTab === 'unscheduled' && styles.sidebarItemActive]}
             onPress={() => handleTabChange('unscheduled')}
           >
-            <Inbox size={22} color={activeTab === 'unscheduled' ? COLORS.secondary : '#4b5563'} />
+            <Archive size={22} color={activeTab === 'unscheduled' ? COLORS.secondary : '#4b5563'} />
             <Text
               style={[
                 styles.sidebarItemText,
                 activeTab === 'unscheduled' && { color: COLORS.secondary, fontWeight: '800' },
               ]}
             >
-              Backlog
+              Archive
             </Text>
           </TouchableOpacity>
 
@@ -579,92 +580,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     flex: 1,
   },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 1000,
-  },
-  overlayFill: {
-    flex: 1,
-  },
-  sidebar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: width * 0.85,
-    backgroundColor: '#fff',
-    zIndex: 1001,
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 5, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  sidebarHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 30,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  sidebarLogo: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#fff',
-    letterSpacing: -1,
-  },
-  logoBadge: {
-    backgroundColor: '#3b0764',
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  sidebarContent: {
-    flex: 1,
-    paddingTop: 20,
-  },
-  sidebarItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 12,
-    gap: 15,
-    marginBottom: 4,
-  },
-  sidebarItemActive: {
-    backgroundColor: '#f5f3ff',
-    borderRadius: 12,
-  },
-  sidebarItemText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4b5563',
-    flex: 1,
-  },
-  sidebarDivider: {
-    height: 1,
-    backgroundColor: '#f3f4f6',
-    marginVertical: 8,
-  },
-  sidebarSectionHeader: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  sidebarSectionTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#9ca3af',
-    letterSpacing: 0.5,
-  },
-  sidebarFooter: {
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-    paddingBottom: 40,
-    paddingTop: 10,
-  },
   empty: {
     alignItems: 'center',
     flex: 1,
@@ -683,26 +598,123 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  fab: {
+    alignItems: 'center',
+    backgroundColor: '#7c7cff',
+    borderRadius: 30,
+    elevation: 8,
+    height: 60,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 20,
+    shadowColor: '#7c7cff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    width: 60,
+    zIndex: 999,
+  },
+  loaderFooter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
   logo: {
     color: '#3b0764',
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
-  topBar: {
-    alignItems: 'center',
+  logoBadge: {
+    backgroundColor: '#3b0764',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 1000,
+  },
+  overlayFill: {
+    flex: 1,
+  },
+  permaDeleteBtn: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 8,
+    padding: 8,
+  },
+  sidebar: {
     backgroundColor: '#fff',
+    bottom: 0,
+    elevation: 10,
+    left: 0,
+    paddingHorizontal: 20,
+    position: 'absolute',
+    shadowColor: '#000',
+    shadowOffset: { width: 5, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    top: 0,
+    width: width * 0.85,
+    zIndex: 1001,
+  },
+  sidebarContent: {
+    flex: 1,
+    paddingTop: 20,
+  },
+  sidebarDivider: {
+    backgroundColor: '#f3f4f6',
+    height: 1,
+    marginVertical: 8,
+  },
+  sidebarFooter: {
+    borderTopColor: '#f3f4f6',
+    borderTopWidth: 1,
+    paddingBottom: 40,
+    paddingTop: 10,
+  },
+  sidebarHeader: {
+    alignItems: 'center',
     borderBottomColor: '#f3f4f6',
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingBottom: 15,
-    paddingHorizontal: 16,
+    paddingVertical: 30,
   },
-  topBarSide: {
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    width: 40,
+  sidebarItem: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 15,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 15,
+  },
+  sidebarItemActive: {
+    backgroundColor: '#f5f3ff',
+    borderRadius: 12,
+  },
+  sidebarItemText: {
+    color: '#4b5563',
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  sidebarLogo: {
+    color: '#fff',
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: -1,
+  },
+  sidebarSectionHeader: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  sidebarSectionTitle: {
+    color: '#9ca3af',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   tagBarContainer: {
     backgroundColor: '#fff',
@@ -736,60 +748,49 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  trashCard: {
-    flexDirection: 'row',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+  topBar: {
     alignItems: 'center',
+    backgroundColor: '#fff',
+    borderBottomColor: '#f3f4f6',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingBottom: 15,
+    paddingHorizontal: 16,
   },
-  trashInfo: {
-    flex: 1,
-  },
-  trashTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  trashDate: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginTop: 4,
+  topBarSide: {
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    width: 40,
   },
   trashActions: {
     flexDirection: 'row',
     gap: 15,
   },
+  trashCard: {
+    alignItems: 'center',
+    borderBottomColor: '#f1f5f9',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 20,
+  },
+  trashDate: {
+    color: '#94a3b8',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  trashInfo: {
+    flex: 1,
+  },
+  trashTitle: {
+    color: '#1e293b',
+    fontSize: 16,
+    fontWeight: '700',
+  },
   untrashBtn: {
-    padding: 8,
     backgroundColor: '#f0fdf4',
     borderRadius: 8,
-  },
-  permaDeleteBtn: {
     padding: 8,
-    backgroundColor: '#fef2f2',
-    borderRadius: 8,
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#7c7cff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#7c7cff',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    zIndex: 999,
-  },
-  loaderFooter: {
-    paddingVertical: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

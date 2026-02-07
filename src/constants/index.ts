@@ -11,6 +11,7 @@ export const COLORS = {
   dark: '#3b0764',
   textSecondary: '#6b7280',
   border: '#f1f5f9',
+  overlay: 'rgba(0,0,0,0.5)',
 };
 
 export const GRADIENTS = {

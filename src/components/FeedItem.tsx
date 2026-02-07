@@ -37,7 +37,9 @@ import {
   RotateCw,
   Undo2,
   CalendarOff,
+  Plus,
 } from 'lucide-react-native';
+import { TagPickerModal } from './TagPickerModal';
 import { MediaCacheService } from '@/services/MediaCacheService';
 import { syncManager } from '@/services/SyncManager';
 import { formatDaysToFrequency, getFrequencyChain, parseFrequencyToDays } from '@/services/FrequencyService';
@@ -52,6 +54,7 @@ import {
   unmarkPostAsReviewed,
   updatePostFrequency,
   updatePostInterval,
+  updatePostTags,
 } from '@/repositories/PostRepository';
 import { COLORS } from '@/constants';
 
@@ -88,11 +91,11 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [mediaAspectRatio, setMediaAspectRatio] = useState(1);
   const [showFreqModal, setShowFreqModal] = useState(false);
+  const [showTagPicker, setShowTagPicker] = useState(false);
   const [freqChain, setFreqChain] = useState<string[]>([]);
 
   const isSimpleNote = !post.instagramUrl;
 
-  const doubleTapRef = useRef(null);
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
   const freqSaveTimeout = useRef<NodeJS.Timeout | null>(null);
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
@@ -259,6 +262,19 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
     }
   };
 
+  const handleUpdateTags = async (newTags: string[]) => {
+    setTags(newTags.sort()); // Optimistic update
+    try {
+      await updatePostTags(post.id, newTags);
+      if (onUpdate) {
+        onUpdate(post.id, { tags: JSON.stringify(newTags) });
+      }
+    } catch (e) {
+      console.error('Failed to update tags', e);
+      // Revert if needed, but for now we trust optimistic
+    }
+  };
+
   const handleReviewed = async () => {
     if (post.isProcessed === 0 && !isSimpleNote) return;
     setIsUpdating(true);
@@ -324,23 +340,36 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
 
   const renderMedia = ({ item }: { item: MediaItem }) => {
     const source = { uri: item.localUri || item.url };
+    const posterSource = item.type === 'video' && item.thumbnail
+      ? { uri: item.thumbnail }
+      : undefined; // We might need to ensure thumbnail is in MediaItem interface or handle it
+
     if (item.type === 'video') {
       return (
         <InstagramVideo
           source={source}
+          // We use the first frame or a placeholder if no thumbnail, but let's try to trust the component to handle loading
+          posterSource={posterSource}
           isVisible={isVisible}
           onAspectRatio={(ratio) => {
-            // Only set aspect ratio if it hasn't been set or if it's significantly different
             if (mediaAspectRatio === 1) setMediaAspectRatio(ratio);
           }}
           aspectRatio={mediaAspectRatio}
+          onDoubleTap={handleReviewed}
         />
       );
     }
     return (
-      <View style={[styles.mediaContainer, { aspectRatio: mediaAspectRatio }]}>
-        <Image source={source} style={styles.media} resizeMode="cover" />
-      </View>
+      <TapGestureHandler
+        onHandlerStateChange={(e) => {
+          if (e.nativeEvent.state === State.ACTIVE) handleReviewed();
+        }}
+        numberOfTaps={2}
+      >
+        <View style={[styles.mediaContainer, { aspectRatio: mediaAspectRatio }]}>
+          <Image source={source} style={styles.media} resizeMode="cover" />
+        </View>
+      </TapGestureHandler>
     );
   };
 
@@ -422,63 +451,56 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
 
       {/* 2. Media Carousel (Only for IG links) */}
       {!isSimpleNote && (
-        <TapGestureHandler
-          onHandlerStateChange={onDoubleTap}
-          numberOfTaps={2}
-          ref={doubleTapRef}
-          enabled={post.isProcessed === 1}
-        >
-          <View style={styles.mediaWrapper}>
-            {post.isProcessed === 0 ? (
-              <Animated.View
-                style={[styles.mediaPlaceholder, styles.processingBox, { opacity: pulseAnim }]}
-              >
-                <DownloadCloud size={40} color="#94a3b8" />
-                <Text style={styles.processingTitle}>Syncing Media...</Text>
-                <ActivityIndicator size="small" color="#94a3b8" style={{ marginTop: 12 }} />
-              </Animated.View>
-            ) : loading ? (
-              <View style={[styles.mediaPlaceholder, styles.loadingBox]}>
-                <ActivityIndicator color="#000" />
-              </View>
-            ) : media.length > 0 ? (
-              <View>
-                <FlatList
-                  data={media}
-                  renderItem={renderMedia}
-                  style={{ aspectRatio: mediaAspectRatio }}
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={false}
-                  keyExtractor={(_, index) => index.toString()}
-                  decelerationRate="fast"
-                  snapToInterval={width}
-                  onScroll={(e) => {
-                    const offset = e.nativeEvent.contentOffset.x;
-                    setActiveMediaIndex(Math.round(offset / width));
-                  }}
-                />
-                {media.length > 1 && (
-                  <View style={styles.paginationContainer}>
-                    {media.map((_, i) => (
-                      <View
-                        key={i}
-                        style={[
-                          styles.paginationDot,
-                          i === activeMediaIndex && styles.paginationDotActive,
-                        ]}
-                      />
-                    ))}
-                  </View>
-                )}
-              </View>
-            ) : (
-              <View style={[styles.mediaPlaceholder, styles.errorBox]}>
-                <Text style={styles.errorText}>Media not available</Text>
-              </View>
-            )}
-          </View>
-        </TapGestureHandler>
+        <View style={styles.mediaWrapper}>
+          {post.isProcessed === 0 ? (
+            <Animated.View
+              style={[styles.mediaPlaceholder, styles.processingBox, { opacity: pulseAnim }]}
+            >
+              <DownloadCloud size={40} color="#94a3b8" />
+              <Text style={styles.processingTitle}>Syncing Media...</Text>
+              <ActivityIndicator size="small" color="#94a3b8" style={{ marginTop: 12 }} />
+            </Animated.View>
+          ) : loading ? (
+            <View style={[styles.mediaPlaceholder, styles.loadingBox]}>
+              <ActivityIndicator color="#000" />
+            </View>
+          ) : media.length > 0 ? (
+            <View>
+              <FlatList
+                data={media}
+                renderItem={renderMedia}
+                style={{ aspectRatio: mediaAspectRatio }}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(_, index) => index.toString()}
+                decelerationRate="fast"
+                snapToInterval={width}
+                onScroll={(e) => {
+                  const offset = e.nativeEvent.contentOffset.x;
+                  setActiveMediaIndex(Math.round(offset / width));
+                }}
+              />
+              {media.length > 1 && (
+                <View style={styles.paginationContainer}>
+                  {media.map((_, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.paginationDot,
+                        i === activeMediaIndex && styles.paginationDotActive,
+                      ]}
+                    />
+                  ))}
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={[styles.mediaPlaceholder, styles.errorBox]}>
+              <Text style={styles.errorText}>Media not available</Text>
+            </View>
+          )}
+        </View>
       )}
 
       {/* 3. Refactored Review Bar (16px Padding) */}
@@ -606,19 +628,24 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
           </TouchableOpacity>
         )}
 
-        {tags.length > 0 && (
-          <View style={styles.labelPillsRow}>
-            {tags.map((tag, idx) => (
-              <TouchableOpacity
-                key={idx}
-                style={styles.pill}
-                onPress={() => onLabelClick?.(tag)}
-              >
-                <Text style={styles.pillText}>{tag}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+        <View style={styles.labelPillsRow}>
+          {tags.map((tag, idx) => (
+            <TouchableOpacity
+              key={idx}
+              style={styles.pill}
+              onPress={() => onLabelClick?.(tag)}
+            >
+              <Text style={styles.pillText}>{tag}</Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity
+            style={[styles.pill, styles.addTagPill]}
+            onPress={() => setShowTagPicker(true)}
+          >
+            <Plus size={12} color={COLORS.primary} style={styles.addTagIcon} />
+            <Text style={styles.addTagText}>Add Tag</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.footerInfo}>
           <Text style={styles.reviewTimeline}>
@@ -696,7 +723,15 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
           </View>
         </TouchableOpacity>
       </Modal>
-    </View>
+
+      {/* Tag Picker Modal */}
+      < TagPickerModal
+        visible={showTagPicker}
+        onClose={() => setShowTagPicker(false)}
+        selectedTags={tags}
+        onTagsChange={handleUpdateTags}
+      />
+    </View >
   );
 });
 
@@ -706,14 +741,14 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   removeFreqBtn: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    marginTop: 16,
-    gap: 8,
     backgroundColor: '#fef2f2',
     borderRadius: 8,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 12,
   },
   removeFreqText: {
     color: '#ef4444',
@@ -721,18 +756,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   mediaWrapper: {
-    width: width,
     backgroundColor: '#000',
+    width: width,
   },
   mediaContainer: {
-    width: width,
-    justifyContent: 'center',
     backgroundColor: '#000',
+    justifyContent: 'center',
     overflow: 'hidden',
+    width: width,
   },
   media: {
-    width: '100%',
     height: '100%',
+    width: '100%',
   },
   mediaPlaceholder: {
     width: width,
@@ -741,85 +776,85 @@ const styles = StyleSheet.create({
   },
   // 1. IG Header (16px)
   noteHeader: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
     backgroundColor: '#f8fafc',
+    borderBottomColor: '#f1f5f9',
+    borderBottomWidth: 1,
   },
   noteIconWrapper: {
-    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#eff6ff',
+    borderRadius: 8,
+    flexDirection: 'row',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 8,
   },
   noteBadgeText: {
+    color: '#2563eb',
     fontSize: 12,
     fontWeight: '700',
-    color: '#2563eb',
     marginLeft: 6,
     textTransform: 'uppercase',
   },
   noteDisplay: {
-    paddingVertical: 12,
-    minHeight: 120,
     backgroundColor: '#fff',
+    minHeight: 120,
+    paddingVertical: 12,
   },
   igHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     zIndex: 100,
   },
   igUserInfo: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
   },
   igAvatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    alignItems: 'center',
     backgroundColor: '#f1f5f9',
+    borderColor: '#e2e8f0',
+    borderRadius: 16,
+    borderWidth: 0.5,
+    height: 32,
+    justifyContent: 'center',
     marginRight: 10,
     overflow: 'hidden',
-    borderWidth: 0.5,
-    borderColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 32,
   },
   igAvatar: {
-    width: '100%',
     height: '100%',
+    width: '100%',
   },
   igUsername: {
+    color: '#262626',
     fontSize: 14,
     fontWeight: '700',
-    color: '#262626',
   },
   menuTrigger: {
     padding: 4,
   },
   dropdownMenu: {
-    position: 'absolute',
-    right: 12,
-    top: 50,
     backgroundColor: '#fff',
     borderRadius: 12,
     elevation: 8,
+    minWidth: 160,
+    padding: 4,
+    position: 'absolute',
+    right: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 10,
+    top: 50,
     zIndex: 1000,
-    minWidth: 160,
-    padding: 4,
   },
   menuItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
     borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   menuItemConfirm: {
     backgroundColor: '#ef4444',
@@ -839,28 +874,28 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   menuItemContent: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 8,
   },
   // 2. Media Carousel (0px)
   processingBox: {
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   processingTitle: {
-    marginTop: 12,
-    fontSize: 14,
     color: '#94a3b8',
+    fontSize: 14,
     fontWeight: '500',
+    marginTop: 12,
   },
   loadingBox: {
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   errorBox: {
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   errorText: {
     color: '#94a3b8',
@@ -869,28 +904,28 @@ const styles = StyleSheet.create({
   // --- Video Overlays ---
   videoOverlay: {
     ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
-    alignItems: 'center',
   },
   pauseIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 32,
+    height: 64,
+    justifyContent: 'center',
+    width: 64,
   },
   muteIndicator: {
-    position: 'absolute',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 20,
     bottom: 16,
+    height: 40,
+    justifyContent: 'center',
+    position: 'absolute',
     right: 16,
     width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   paginationContainer: {
     position: 'absolute',
@@ -901,10 +936,10 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   paginationDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
     backgroundColor: '#cbd5e1',
+    borderRadius: 3,
+    height: 6,
+    width: 6,
   },
   paginationDotActive: {
     backgroundColor: COLORS.secondary,
@@ -912,27 +947,27 @@ const styles = StyleSheet.create({
   },
   // --- 3. Review Bar (16px) ---
   reviewBar: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    justifyContent: 'space-between',
   },
   rightActionsGroup: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 12,
   },
   doneBtn: {
-    height: 42,
-    paddingHorizontal: 16,
+    alignItems: 'center',
     backgroundColor: COLORS.primary,
     borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
     elevation: 2,
+    flexDirection: 'row',
+    gap: 6,
+    height: 42,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
@@ -953,59 +988,59 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   freqDisplayContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 6,
   },
   freqLabel: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    color: '#0f172a',
     fontSize: 14,
     fontWeight: '800',
-    color: '#0f172a',
-    backgroundColor: '#f1f5f9',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 8,
   },
   divider: {
-    width: 1,
-    height: 24,
     backgroundColor: '#e2e8f0',
+    height: 24,
+    width: 1,
   },
   stepControls: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 4,
   },
   stepBtnIcon: {
-    width: 38,
-    height: 38,
-    justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
   },
   // --- 4. Caption Area (30px) ---
   captionArea: {
-    paddingHorizontal: 30,
     paddingBottom: 24,
+    paddingHorizontal: 30,
   },
   postTitle: {
+    color: '#0f172a',
     fontSize: 18,
     fontWeight: '800',
-    color: '#0f172a',
     lineHeight: 24,
     marginBottom: 6,
-    padding: 0,
     margin: 0,
+    padding: 0,
   },
   noteContent: {
+    color: '#334155',
     fontSize: 15,
     lineHeight: 22,
-    color: '#334155',
-    padding: 0,
     margin: 0,
+    padding: 0,
   },
   inputReset: {
     backgroundColor: 'transparent',
@@ -1019,39 +1054,39 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   noteInput: {
-    textAlignVertical: 'top',
     minHeight: 80,
+    textAlignVertical: 'top',
   },
   originalCaptionSection: {
-    marginTop: 14,
-    borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
+    borderTopWidth: 1,
+    marginTop: 14,
     paddingTop: 10,
   },
   captionToggle: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 8,
     paddingVertical: 6,
   },
   captionToggleText: {
-    fontSize: 12,
     color: '#64748b',
+    fontSize: 12,
     fontWeight: '600',
   },
   originalCaptionCard: {
     backgroundColor: '#f8fafc',
-    padding: 12,
+    borderLeftColor: '#cbd5e1',
+    borderLeftWidth: 3,
     borderRadius: 10,
     marginTop: 10,
-    borderLeftWidth: 3,
-    borderLeftColor: '#cbd5e1',
+    padding: 12,
   },
   originalCaptionText: {
-    fontSize: 12,
-    lineHeight: 18,
     color: '#475569',
+    fontSize: 12,
     fontStyle: 'italic',
+    lineHeight: 18,
   },
   labelPillsRow: {
     flexDirection: 'row',
@@ -1061,24 +1096,40 @@ const styles = StyleSheet.create({
   },
   pill: {
     backgroundColor: 'rgba(0,0,0,0.05)',
+    borderColor: 'rgba(0,0,0,0.1)',
     borderRadius: 12,
+    borderWidth: 0.5,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderWidth: 0.5,
-    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  addTagPill: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderColor: COLORS.primary,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    flexDirection: 'row',
   },
   pillText: {
     color: '#3c4043',
     fontSize: 11,
     fontWeight: '500',
   },
+  addTagIcon: {
+    marginRight: 4,
+  },
+  addTagText: {
+    color: COLORS.primary,
+    fontSize: 11,
+    fontWeight: '500',
+  },
   footerInfo: {
-    marginTop: 20,
     alignItems: 'flex-end',
+    marginTop: 20,
   },
   reviewTimeline: {
-    fontSize: 11,
     color: '#94a3b8',
+    fontSize: 11,
     fontStyle: 'italic',
   },
   modalOverlay: {
@@ -1090,19 +1141,19 @@ const styles = StyleSheet.create({
   popupContent: {
     backgroundColor: '#fff',
     borderRadius: 24,
-    padding: 24,
-    width: '85%',
-    maxWidth: 340,
     elevation: 20,
+    maxWidth: 340,
+    padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
     shadowRadius: 15,
+    width: '85%',
   },
   popupTitle: {
+    color: '#0f172a',
     fontSize: 18,
     fontWeight: '800',
-    color: '#0f172a',
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -1113,23 +1164,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   quickFreqChip: {
+    alignItems: 'center',
     backgroundColor: '#f1f5f9',
+    borderColor: '#e2e8f0',
     borderRadius: 12,
+    borderWidth: 1,
+    minWidth: 80,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    minWidth: 80,
-    alignItems: 'center',
   },
   quickFreqChipActive: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
   quickFreqChipText: {
+    color: '#475569',
     fontSize: 13,
     fontWeight: '600',
-    color: '#475569',
   },
   quickFreqChipTextActive: {
     color: '#fff',
@@ -1149,17 +1200,25 @@ const InstagramVideo = ({
   isVisible,
   onAspectRatio,
   aspectRatio = 1,
+  onDoubleTap,
+  posterSource,
 }: {
   source: any;
   isVisible?: boolean;
   onAspectRatio?: (ratio: number) => void;
   aspectRatio?: number;
+  onDoubleTap?: () => void;
+  posterSource?: any;
 }) => {
   const videoRef = useRef<Video>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [showMuteIndicator, setShowMuteIndicator] = useState(false);
   const muteAnim = useRef(new Animated.Value(0)).current;
+
+  // Refs for gesture handlers
+  const singleTapRef = useRef(null);
+  const doubleTapRef = useRef(null);
 
   useEffect(() => {
     if (!isVisible) {
@@ -1193,44 +1252,71 @@ const InstagramVideo = ({
     }
   };
 
+  const onDoubleTapHandler = (event: any) => {
+    if (event.nativeEvent.state === State.ACTIVE && onDoubleTap) {
+      onDoubleTap();
+    }
+  };
+
+  const onSingleTapHandler = (event: any) => {
+    if (event.nativeEvent.state === State.ACTIVE) {
+      toggleMute();
+    }
+  };
+
   return (
-    <LongPressGestureHandler onHandlerStateChange={handleLongPress} minDurationMs={200}>
+    <LongPressGestureHandler onHandlerStateChange={handleLongPress} minDurationMs={300}>
       <View style={[styles.mediaContainer, { aspectRatio }]}>
         <TapGestureHandler
-          onHandlerStateChange={(e) => e.nativeEvent.state === State.ACTIVE && toggleMute()}
+          ref={doubleTapRef}
+          numberOfTaps={2}
+          onHandlerStateChange={onDoubleTapHandler}
         >
           <View style={StyleSheet.absoluteFill}>
-            <Video
-              ref={videoRef}
-              style={styles.media}
-              source={source}
-              resizeMode={ResizeMode.COVER}
-              isLooping
-              isMuted={isMuted}
-              shouldPlay={isVisible && !isPaused}
-              onReadyForDisplay={(event) => {
-                if (onAspectRatio) {
-                  const ratio = event.naturalSize.width / event.naturalSize.height;
-                  onAspectRatio(ratio);
-                }
-              }}
-            />
+            <TapGestureHandler
+              ref={singleTapRef}
+              numberOfTaps={1}
+              waitFor={doubleTapRef}
+              onHandlerStateChange={onSingleTapHandler}
+            >
+              <View style={StyleSheet.absoluteFill}>
+                <Video
+                  ref={videoRef}
+                  style={styles.media}
+                  source={source}
+                  resizeMode={ResizeMode.COVER}
+                  isLooping
+                  isMuted={isMuted}
+                  shouldPlay={isVisible && !isPaused}
+                  usePoster={true}
+                  posterSource={posterSource}
+                  posterStyle={{ resizeMode: 'cover' }}
+                  onReadyForDisplay={(event) => {
+                    if (onAspectRatio) {
+                      const ratio = event.naturalSize.width / event.naturalSize.height;
+                      onAspectRatio(ratio);
+                    }
+                  }}
+                  onError={(e) => console.log("Video Error:", e)}
+                />
 
-            {/* Hold to Pause Indicator */}
-            {isPaused && (
-              <View style={styles.videoOverlay}>
-                <View style={styles.pauseIconContainer}>
-                  <Play size={40} color="#fff" fill="#fff" style={{ marginLeft: 4 }} />
-                </View>
+                {/* Hold to Pause Indicator */}
+                {isPaused && (
+                  <View style={styles.videoOverlay}>
+                    <View style={styles.pauseIconContainer}>
+                      <Play size={40} color="#fff" fill="#fff" style={{ marginLeft: 4 }} />
+                    </View>
+                  </View>
+                )}
+
+                {/* Mute/Unmute Indicator */}
+                {showMuteIndicator && (
+                  <Animated.View style={[styles.muteIndicator, { opacity: muteAnim }]}>
+                    {isMuted ? <VolumeX size={24} color="#fff" /> : <Volume2 size={24} color="#fff" />}
+                  </Animated.View>
+                )}
               </View>
-            )}
-
-            {/* Mute/Unmute Indicator */}
-            {showMuteIndicator && (
-              <Animated.View style={[styles.muteIndicator, { opacity: muteAnim }]}>
-                {isMuted ? <VolumeX size={24} color="#fff" /> : <Volume2 size={24} color="#fff" />}
-              </Animated.View>
-            )}
+            </TapGestureHandler>
           </View>
         </TapGestureHandler>
       </View>

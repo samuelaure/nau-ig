@@ -5,6 +5,7 @@ export interface MediaItem {
   type: 'image' | 'video';
   url: string;
   localUri?: string;
+  thumbnail?: string;
 }
 
 export interface Post {
@@ -183,6 +184,10 @@ export const updatePostInterval = async (id: number, interval: number): Promise<
 
 export const updatePostTitle = async (id: number, title: string): Promise<void> => {
   await runSql('UPDATE posts SET title = ? WHERE id = ?', [title, id]);
+};
+
+export const updatePostTags = async (id: number, tags: string[]): Promise<void> => {
+  await runSql('UPDATE posts SET tags = ? WHERE id = ?', [JSON.stringify(tags), id]);
 };
 
 export const deletePost = async (id: number): Promise<void> => {

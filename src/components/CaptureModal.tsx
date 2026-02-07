@@ -29,6 +29,7 @@ import {
   Calendar as CalendarIcon,
   Check,
 } from 'lucide-react-native';
+import { TagPickerModal } from './TagPickerModal';
 import { savePost } from '@/repositories/PostRepository';
 import { getAllLabels, createLabel } from '@/repositories/LabelRepository';
 import { SYNC_POLLING_INTERVAL, COLORS } from '@/constants';
@@ -51,9 +52,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [newTag, setNewTag] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [existingTags, setExistingTags] = useState<string[]>([]);
 
   // Frequency States
   const [repeatInterval, setRepeatInterval] = useState('1');
@@ -79,7 +78,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
     const rawUrl = shareValue || manualUrl;
     if (rawUrl) {
       const urlMatch = rawUrl.match(/https?:\/\/[^\s]+/);
-      let extractedUrl = urlMatch ? urlMatch[0] : rawUrl;
+      const extractedUrl = urlMatch ? urlMatch[0] : rawUrl;
       try {
         const urlObj = new URL(extractedUrl);
         setFinalUrl(`${urlObj.origin}${urlObj.pathname}`);
@@ -111,41 +110,9 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
   }, []);
 
   const loadData = async () => {
-    const [labels, chain] = await Promise.all([
-      getAllLabels(),
-      getFrequencyChain(),
-    ]);
-    setExistingTags(labels.map(l => l.name));
+    const chain = await getFrequencyChain();
     setFreqChain(chain);
   };
-
-  const toggleTag = (tag: string) => {
-    if (selectedTags.includes(tag)) {
-      setSelectedTags(selectedTags.filter((t) => t !== tag));
-    } else {
-      setSelectedTags([...selectedTags, tag]);
-    }
-  };
-
-  const addNewTag = async () => {
-    const tag = newTag.trim();
-    if (tag) {
-      const existing = existingTags.find((t) => t.toLowerCase() === tag.toLowerCase());
-      const tagToUse = existing || tag;
-
-      if (!existing) {
-        await createLabel(tagToUse);
-        setExistingTags([tagToUse, ...existingTags]);
-      }
-
-      if (!selectedTags.includes(tagToUse)) {
-        setSelectedTags([...selectedTags, tagToUse]);
-      }
-      setNewTag('');
-    }
-  };
-
-  const filteredTags = existingTags.filter((t) => t.toLowerCase().includes(newTag.toLowerCase()));
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
@@ -332,61 +299,12 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
         </Animated.View>
 
         {/* Tag Picker Modal */}
-        <Modal
+        <TagPickerModal
           visible={showTagPicker}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowTagPicker(false)}
-        >
-          <TouchableOpacity
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={() => setShowTagPicker(false)}
-          >
-            <View style={styles.popupContent} onStartShouldSetResponder={() => true}>
-              <View style={styles.popupHeader}>
-                <TextInput
-                  style={styles.popupInput}
-                  placeholder="New label..."
-                  value={newTag}
-                  onChangeText={setNewTag}
-                />
-                <TouchableOpacity onPress={addNewTag} style={styles.addTagBtn}>
-                  <Plus size={20} color={COLORS.primary} />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={styles.popupList}>
-                {filteredTags.map((tag) => {
-                  const isSelected = selectedTags.includes(tag);
-                  return (
-                    <TouchableOpacity
-                      key={tag}
-                      style={styles.popupItem}
-                      onPress={() => toggleTag(tag)}
-                    >
-                      {isSelected ? (
-                        <CheckSquare size={18} color={COLORS.primary} />
-                      ) : (
-                        <Square size={18} color="#5f6368" />
-                      )}
-                      <Text
-                        style={[styles.popupItemText, isSelected && styles.popupItemTextActive]}
-                      >
-                        {tag}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-              <TouchableOpacity
-                style={[styles.doneBtn, { marginTop: 12 }]}
-                onPress={() => setShowTagPicker(false)}
-              >
-                <Text style={styles.doneBtnText}>OK</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </Modal>
+          onClose={() => setShowTagPicker(false)}
+          selectedTags={selectedTags}
+          onTagsChange={setSelectedTags}
+        />
 
         {/* Frequency Picker Modal */}
         <Modal
@@ -542,88 +460,16 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  container: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  dialog: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    elevation: 24,
-    maxWidth: 400,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    width: '100%',
-  },
-  urlHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    marginBottom: 12,
-    opacity: 0.6,
-  },
-  urlText: {
-    color: '#5f6368',
-    fontSize: 11,
-    marginLeft: 4,
-  },
-  titleInput: {
-    color: '#202124',
-    fontSize: 22,
-    fontWeight: '700',
-    marginBottom: 8,
-    padding: 0,
-    marginTop: 10,
-  },
-  urlInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  urlInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1e293b',
-    paddingVertical: 10,
-    marginLeft: 8,
-  },
-  inputLinkIcon: {
-    opacity: 0.7,
-  },
-  noteInput: {
-    color: '#3c4043',
-    fontSize: 16,
-    lineHeight: 24,
-    minHeight: 100,
-    padding: 0,
-    textAlignVertical: 'top',
-  },
-  bottomRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
   actionsLeft: {
     flexDirection: 'row',
     gap: 12,
   },
-  iconButton: {
+  addTagBtn: {
     padding: 8,
-    position: 'relative',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   badge: {
     alignItems: 'center',
@@ -641,6 +487,235 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '700',
+  },
+  bottomRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  calendarTrigger: {
+    padding: 4,
+  },
+  container: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  dateInput: {
+    color: '#3c4043',
+    flex: 1,
+    fontSize: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  dateInputWrapper: {
+    alignItems: 'center',
+    backgroundColor: '#f1f3f4',
+    borderRadius: 8,
+    flex: 1,
+    flexDirection: 'row',
+    paddingRight: 8,
+  },
+  dateRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  dialog: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    elevation: 24,
+    maxWidth: 400,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    width: '100%',
+  },
+  doneBtn: {
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+    paddingVertical: 12,
+  },
+  doneBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  dropdownContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  dropdownItem: {
+    padding: 12,
+  },
+  dropdownItemText: {
+    color: '#3c4043',
+    fontSize: 14,
+  },
+  dropdownItemTextActive: {
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  dropdownList: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    elevation: 4,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    top: 40,
+    zIndex: 20,
+  },
+  dropdownTrigger: {
+    alignItems: 'center',
+    backgroundColor: '#f1f3f4',
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  dropdownValue: {
+    color: '#3c4043',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  freqInput: {
+    backgroundColor: '#f1f3f4',
+    borderRadius: 8,
+    fontSize: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    textAlign: 'center',
+    width: 50,
+  },
+  freqLabel: {
+    color: '#5f6368',
+    fontSize: 14,
+    fontWeight: '600',
+    width: 50,
+  },
+  freqRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+    zIndex: 10,
+  },
+  iconButton: {
+    padding: 8,
+    position: 'relative',
+  },
+  inputLinkIcon: {
+    opacity: 0.7,
+  },
+  modalOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  noteInput: {
+    color: '#3c4043',
+    fontSize: 16,
+    lineHeight: 24,
+    minHeight: 100,
+    padding: 0,
+    textAlignVertical: 'top',
+  },
+  popupContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    maxHeight: '80%',
+    maxWidth: 340,
+    padding: 16,
+    width: '85%',
+  },
+  popupHeader: {
+    alignItems: 'center',
+    borderBottomColor: '#f1f3f4',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    marginBottom: 12,
+    paddingBottom: 8,
+  },
+  popupInput: {
+    flex: 1,
+    fontSize: 16,
+  },
+  popupItem: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    paddingVertical: 12,
+  },
+  popupItemText: {
+    color: '#3c4043',
+    fontSize: 15,
+    marginLeft: 12,
+  },
+  popupItemTextActive: {
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  popupList: {
+    maxHeight: 200,
+  },
+  popupTitle: {
+    color: '#202124',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 20,
+  },
+  previewTag: {
+    backgroundColor: '#f1f3f4',
+    borderRadius: 12,
+    marginRight: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  previewTagText: {
+    color: '#5f6368',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  quickFreqChip: {
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  quickFreqChipText: {
+    color: '#475569',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  quickFreqContainer: {
+    marginBottom: 20,
+  },
+  quickFreqGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  quickFreqLabel: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    textTransform: 'uppercase',
   },
   saveButton: {
     backgroundColor: COLORS.secondary,
@@ -660,197 +735,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 12,
   },
-  previewTag: {
-    backgroundColor: '#f1f3f4',
-    borderRadius: 12,
-    marginRight: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  titleInput: {
+    color: '#202124',
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 8,
+    marginTop: 10,
+    padding: 0,
   },
-  previewTagText: {
-    color: '#5f6368',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  modalOverlay: {
+  urlHeader: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    flex: 1,
-    justifyContent: 'center',
-  },
-  popupContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    maxHeight: '80%',
-    padding: 16,
-    width: '85%',
-    maxWidth: 340,
-  },
-  popupHeader: {
-    alignItems: 'center',
-    borderBottomColor: '#f1f3f4',
-    borderBottomWidth: 1,
     flexDirection: 'row',
     marginBottom: 12,
-    paddingBottom: 8,
+    opacity: 0.6,
   },
-  popupInput: {
-    flex: 1,
-    fontSize: 16,
-  },
-  addTagBtn: {
-    padding: 8,
-  },
-  popupList: {
-    maxHeight: 200,
-  },
-  popupItem: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    paddingVertical: 12,
-  },
-  popupItemText: {
-    color: '#3c4043',
-    fontSize: 15,
-    marginLeft: 12,
-  },
-  popupItemTextActive: {
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  popupTitle: {
-    color: '#202124',
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 20,
-  },
-  freqRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
-    zIndex: 10,
-  },
-  freqLabel: {
-    color: '#5f6368',
-    fontSize: 14,
-    fontWeight: '600',
-    width: 50,
-  },
-  freqInput: {
-    backgroundColor: '#f1f3f4',
-    borderRadius: 8,
-    fontSize: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    textAlign: 'center',
-    width: 50,
-  },
-  dropdownContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  dropdownTrigger: {
-    alignItems: 'center',
-    backgroundColor: '#f1f3f4',
-    borderRadius: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  dropdownValue: {
-    color: '#3c4043',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  dropdownList: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    elevation: 4,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    top: 40,
-    zIndex: 20,
-  },
-  dropdownItem: {
-    padding: 12,
-  },
-  dropdownItemText: {
-    color: '#3c4043',
-    fontSize: 14,
-  },
-  dropdownItemTextActive: {
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  dateRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  dateInputWrapper: {
-    alignItems: 'center',
-    backgroundColor: '#f1f3f4',
-    borderRadius: 8,
-    flex: 1,
-    flexDirection: 'row',
-    paddingRight: 8,
-  },
-  dateInput: {
-    color: '#3c4043',
+  urlInput: {
+    color: '#1e293b',
     flex: 1,
     fontSize: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    marginLeft: 8,
+    paddingVertical: 10,
   },
-  calendarTrigger: {
-    padding: 4,
-  },
-  doneBtn: {
+  urlInputContainer: {
     alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    borderRadius: 8,
-    paddingVertical: 12,
-  },
-  doneBtnText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  quickFreqContainer: {
-    marginBottom: 20,
-  },
-  quickFreqLabel: {
-    color: '#94a3b8',
-    fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    marginBottom: 8,
-    letterSpacing: 0.5,
-  },
-  quickFreqGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  quickFreqChip: {
     backgroundColor: '#f8fafc',
-    borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    marginBottom: 16,
+    paddingHorizontal: 12,
   },
-  quickFreqChipText: {
-    fontSize: 12,
-    color: '#475569',
-    fontWeight: '600',
+  urlText: {
+    color: '#5f6368',
+    fontSize: 11,
+    marginLeft: 4,
   },
 });
