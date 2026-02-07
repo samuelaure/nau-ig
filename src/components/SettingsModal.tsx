@@ -233,15 +233,33 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
+  actionBtn: {
+    alignItems: 'center',
+    backgroundColor: '#f5f3ff',
+    borderColor: '#e0e7ff',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
-  container: {
-    flex: 1,
-    justifyContent: 'center',
+  actionBtnText: {
+    color: COLORS.secondary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  badge: {
+    alignItems: 'center',
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 20,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
   },
   card: {
     backgroundColor: '#fff',
@@ -252,58 +270,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
   },
-  header: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '800',
+  container: {
+    flex: 1,
+    justifyContent: 'center',
   },
   content: {
     gap: 12,
-  },
-  label: {
-    color: '#374151',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  inputContainer: {
-    alignItems: 'center',
-    backgroundColor: '#f9fafb',
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    borderWidth: 1,
-    flexDirection: 'row',
-    paddingHorizontal: 12,
-  },
-  inputIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    fontSize: 14,
-    paddingVertical: 12,
-    color: '#111827',
-  },
-  textAreaContainer: {
-    alignItems: 'flex-start',
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  sectionDivider: {
-    backgroundColor: '#f3f4f6',
-    height: 1,
-    marginVertical: 4,
   },
   dangerActionBtn: {
     alignItems: 'center',
@@ -320,26 +292,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  helpText: {
-    color: '#6b7280',
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  actionBtn: {
-    alignItems: 'center',
-    backgroundColor: '#f5f3ff',
-    borderColor: '#e0e7ff',
-    borderRadius: 12,
-    borderWidth: 1,
-    flexDirection: 'row',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  actionBtnText: {
-    color: COLORS.secondary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
   disabledBtn: {
     backgroundColor: '#f9fafb',
     borderColor: '#f3f4f6',
@@ -347,18 +299,54 @@ const styles = StyleSheet.create({
   disabledText: {
     color: '#9ca3af',
   },
-  badge: {
-    backgroundColor: '#ef4444',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    minWidth: 20,
+  header: {
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
   },
-  badgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
+  helpText: {
+    color: '#6b7280',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  input: {
+    color: '#111827',
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 12,
+  },
+  inputContainer: {
+    alignItems: 'center',
+    backgroundColor: '#f9fafb',
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+  },
+  inputIcon: {
+    marginRight: 8,
+  },
+  label: {
+    color: '#374151',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  labelRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  overlay: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  rotate: {
+    // Note: React Native doesn't support rotation animation in styles alone easily without Animated.
+    // For now, it will just stay static but we could add animation later if needed.
   },
   saveBtn: {
     alignItems: 'center',
@@ -372,8 +360,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  rotate: {
-    // Note: React Native doesn't support rotation animation in styles alone easily without Animated.
-    // For now, it will just stay static but we could add animation later if needed.
+  sectionDivider: {
+    backgroundColor: '#f3f4f6',
+    height: 1,
+    marginVertical: 4,
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  textAreaContainer: {
+    alignItems: 'flex-start',
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
   },
 });
