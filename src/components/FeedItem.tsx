@@ -18,6 +18,8 @@ import {
   LongPressGestureHandler,
   State,
   GestureHandlerRootView,
+  TapGestureHandlerStateChangeEvent,
+  LongPressGestureHandlerStateChangeEvent,
 } from 'react-native-gesture-handler';
 import {
   Volume2,
@@ -516,11 +518,11 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
           disabled={isUpdating || (post.isProcessed === 0 && !isSimpleNote)}
         >
           {isUpdating ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={COLORS.background} />
           ) : isHistory ? (
-            <Undo2 size={18} color="#fff" />
+            <Undo2 size={18} color={COLORS.background} />
           ) : (
-            <Check size={18} color="#fff" strokeWidth={3} />
+            <Check size={18} color={COLORS.background} strokeWidth={3} />
           )}
           <Text style={styles.doneBtnText}>{isHistory ? 'Undo' : 'Done'}</Text>
         </TouchableOpacity>
@@ -1186,7 +1188,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   modalDoneBtnText: {
-    color: '#fff',
+    color: COLORS.background,
     fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
@@ -1239,7 +1241,7 @@ const InstagramVideo = ({
     }).start(() => setShowMuteIndicator(false));
   };
 
-  const handleLongPress = (event: any) => {
+  const handleLongPress = (event: LongPressGestureHandlerStateChangeEvent) => {
     if (event.nativeEvent.state === State.ACTIVE) {
       setIsPaused(true);
       videoRef.current?.pauseAsync();
@@ -1252,13 +1254,13 @@ const InstagramVideo = ({
     }
   };
 
-  const onDoubleTapHandler = (event: any) => {
+  const onDoubleTapHandler = (event: TapGestureHandlerStateChangeEvent) => {
     if (event.nativeEvent.state === State.ACTIVE && onDoubleTap) {
       onDoubleTap();
     }
   };
 
-  const onSingleTapHandler = (event: any) => {
+  const onSingleTapHandler = (event: TapGestureHandlerStateChangeEvent) => {
     if (event.nativeEvent.state === State.ACTIVE) {
       toggleMute();
     }
@@ -1304,7 +1306,7 @@ const InstagramVideo = ({
                 {isPaused && (
                   <View style={styles.videoOverlay}>
                     <View style={styles.pauseIconContainer}>
-                      <Play size={40} color="#fff" fill="#fff" style={{ marginLeft: 4 }} />
+                      <Play size={40} color={COLORS.background} fill={COLORS.background} style={{ marginLeft: 4 }} />
                     </View>
                   </View>
                 )}
@@ -1312,7 +1314,7 @@ const InstagramVideo = ({
                 {/* Mute/Unmute Indicator */}
                 {showMuteIndicator && (
                   <Animated.View style={[styles.muteIndicator, { opacity: muteAnim }]}>
-                    {isMuted ? <VolumeX size={24} color="#fff" /> : <Volume2 size={24} color="#fff" />}
+                    {isMuted ? <VolumeX size={24} color={COLORS.background} /> : <Volume2 size={24} color={COLORS.background} />}
                   </Animated.View>
                 )}
               </View>
