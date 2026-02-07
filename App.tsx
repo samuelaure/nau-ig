@@ -85,19 +85,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent', // Root should be transparent for CaptureActivity
     flex: 1,
   },
+  loadingContainer: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    flex: 1,
+    justifyContent: 'center', // Slight white overlay while loading
+  },
+  loadingText: {
+    color: '#666',
+    fontSize: 14,
+    marginTop: 12,
+  },
   shareOverlay: {
     backgroundColor: 'transparent',
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.7)', // Slight white overlay while loading
-  },
-  loadingText: {
-    marginTop: 12,
-    color: '#666',
-    fontSize: 14,
   },
 });
