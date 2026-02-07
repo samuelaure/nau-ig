@@ -17,6 +17,7 @@ import { SYNC_POLLING_INTERVAL, COLORS } from '@/constants';
 import { DEFAULT_FREQUENCY_CHAIN } from '@/services/FrequencyService';
 import { syncManager } from '@/services/SyncManager';
 import { MediaCacheService } from '@/services/MediaCacheService';
+import { BackupService } from '@/services/BackupService';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -28,6 +29,7 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
   const [frequencyChain, setFrequencyChain] = useState('');
   const [isClearing, setIsClearing] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
+  const [isBackingUp, setIsBackingUp] = useState(false);
   const [standbyCount, setStandbyCount] = useState(0);
 
   const loadStandbyCount = async () => {
@@ -121,6 +123,15 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
     }
   };
 
+  const handleBackup = async () => {
+    setIsBackingUp(true);
+    try {
+      await BackupService.exportDatabase();
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -132,7 +143,7 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
             <View style={styles.header}>
               <Text style={styles.title}>Configuration</Text>
               <TouchableOpacity onPress={onClose}>
-                <X size={24} color="#000" />
+                <X size={24} color={COLORS.dark} />
               </TouchableOpacity>
             </View>
 
@@ -140,7 +151,7 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
               {/* API Settings */}
               <Text style={styles.label}>Apify API Token</Text>
               <View style={styles.inputContainer}>
-                <Globe size={18} color="#9ca3af" style={styles.inputIcon} />
+                <Globe size={18} color={COLORS.textSecondary} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="apify_api_..."
@@ -155,7 +166,7 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
               <View style={styles.sectionDivider} />
               <Text style={styles.label}>Frequency Levels Chain</Text>
               <View style={[styles.inputContainer, styles.textAreaContainer]}>
-                <Clock size={18} color="#9ca3af" style={[styles.inputIcon, { marginTop: 12 }]} />
+                <Clock size={18} color={COLORS.textSecondary} style={[styles.inputIcon, { marginTop: 12 }]} />
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   placeholder="1 day, 2 days, 1 week..."
@@ -178,11 +189,11 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
                 onPress={handleClearCache}
                 disabled={isClearing}
               >
-                <Database size={18} color="#ef4444" style={styles.inputIcon} />
+                <Database size={18} color={COLORS.error} style={styles.inputIcon} />
                 <Text style={styles.dangerActionText}>
                   {isClearing ? 'Clearing...' : 'Clear Media Cache'}
                 </Text>
-                <Trash2 size={16} color="#ef4444" style={{ marginLeft: 'auto' }} />
+                <Trash2 size={16} color={COLORS.error} style={{ marginLeft: 'auto' }} />
               </TouchableOpacity>
               <Text style={styles.helpText}>
                 Clearing the cache frees up local storage. Media is automatically re-downloaded when
@@ -206,7 +217,7 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
               >
                 <RefreshCcw
                   size={18}
-                  color={standbyCount > 0 ? '#4f46e5' : '#9ca3af'}
+                  color={standbyCount > 0 ? COLORS.secondary : COLORS.textSecondary}
                   style={[styles.inputIcon, isRecovering && styles.rotate]}
                 />
                 <Text style={[styles.actionBtnText, standbyCount === 0 && styles.disabledText]}>
@@ -217,6 +228,23 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
                 {standbyCount > 0
                   ? `There are ${standbyCount} captures in standby after failing to process. Tap to retry them.`
                   : 'All captures are processing normally or are fully synced.'}
+              </Text>
+
+              {/* Data Management */}
+              <View style={styles.sectionDivider} />
+              <Text style={styles.label}>Data Management</Text>
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={handleBackup}
+                disabled={isBackingUp}
+              >
+                <Database size={18} color={COLORS.primary} style={styles.inputIcon} />
+                <Text style={styles.actionBtnText}>
+                  {isBackingUp ? 'Exporting...' : 'Backup Data'}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.helpText}>
+                Export a copy of your database to save securely or transfer to another device.
               </Text>
 
               <View style={styles.sectionDivider} />
@@ -339,7 +367,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   overlay: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: COLORS.overlay,
     flex: 1,
     justifyContent: 'center',
     padding: 20,
