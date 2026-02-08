@@ -6,6 +6,7 @@ export interface MediaItem {
   url: string;
   localUri?: string;
   thumbnail?: string;
+  localThumbnailUri?: string;
 }
 
 export interface Post {
