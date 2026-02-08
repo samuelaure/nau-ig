@@ -345,19 +345,18 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
     }
   };
 
-  const renderMedia = ({ item }: { item: MediaItem }) => {
+  const renderMedia = ({ item, index }: { item: MediaItem; index: number }) => {
     const source = { uri: item.localUri || item.url };
-    const posterSource = item.type === 'video' && item.thumbnail
-      ? { uri: item.thumbnail }
-      : undefined; // We might need to ensure thumbnail is in MediaItem interface or handle it
+    const posterSource = item.type === 'video'
+      ? (item.localThumbnailUri ? { uri: item.localThumbnailUri } : (item.thumbnail ? { uri: item.thumbnail } : undefined))
+      : undefined;
 
     if (item.type === 'video') {
       return (
         <InstagramVideo
           source={source}
-          // We use the first frame or a placeholder if no thumbnail, but let's try to trust the component to handle loading
           posterSource={posterSource}
-          isVisible={isVisible}
+          isVisible={isVisible && index === activeMediaIndex}
           onAspectRatio={(ratio) => {
             if (mediaAspectRatio === 1) setMediaAspectRatio(ratio);
           }}
@@ -983,9 +982,9 @@ const styles = StyleSheet.create({
     width: 8,
   },
   syncOverlay: {
+    left: 20,
     position: 'absolute',
     top: 20,
-    left: 20,
     zIndex: 10,
   },
   // --- 3. Review Bar (16px) ---
@@ -1259,17 +1258,55 @@ const InstagramVideo = ({
   const [showMuteIndicator, setShowMuteIndicator] = useState(false);
   const muteAnim = useRef(new Animated.Value(0)).current;
 
+  // Virtualization State
+  const [showVideo, setShowVideo] = useState(false);
+  const [thumbnail, setThumbnail] = useState(posterSource);
+  const settleTimeout = useRef<NodeJS.Timeout | null>(null);
+
   // Refs for gesture handlers
   const singleTapRef = useRef(null);
   const doubleTapRef = useRef(null);
 
+  // 1. Settle-to-Play Logic
   useEffect(() => {
-    if (!isVisible) {
-      videoRef.current?.pauseAsync();
-    } else if (!isPaused) {
-      videoRef.current?.playAsync();
+    if (isVisible) {
+      if (settleTimeout.current) clearTimeout(settleTimeout.current);
+      settleTimeout.current = setTimeout(() => {
+        setShowVideo(true);
+      }, 250); // 250ms delay to ensure user stopped scrolling
+    } else {
+      if (settleTimeout.current) clearTimeout(settleTimeout.current);
+      setShowVideo(false);
+      setIsPaused(false); // Reset pause state when scrolling away
     }
-  }, [isVisible, isPaused]);
+  }, [isVisible]);
+
+  // 2. Playback Control
+  useEffect(() => {
+    if (showVideo) {
+      if (!isPaused) {
+        videoRef.current?.playAsync();
+      } else {
+        videoRef.current?.pauseAsync();
+      }
+    }
+  }, [showVideo, isPaused]);
+
+  // 3. Thumbnail Generation (Lazy)
+  useEffect(() => {
+    let active = true;
+    const generateIfNeeded = async () => {
+      if (!thumbnail && source?.uri) {
+        // Only generate if we don't have a thumbnail (posterSource was undefined)
+        const generatedUri = await MediaCacheService.ensureThumbnailCached(source.uri);
+        if (active && generatedUri) {
+          setThumbnail({ uri: generatedUri });
+        }
+      }
+    };
+    generateIfNeeded();
+    return () => { active = false; };
+  }, [source?.uri, thumbnail]);
 
   const toggleMute = () => {
     setIsMuted(!isMuted);
@@ -1285,13 +1322,11 @@ const InstagramVideo = ({
   const handleLongPress = (event: LongPressGestureHandlerStateChangeEvent) => {
     if (event.nativeEvent.state === State.ACTIVE) {
       setIsPaused(true);
-      videoRef.current?.pauseAsync();
     } else if (
       event.nativeEvent.state === State.END ||
       event.nativeEvent.state === State.CANCELLED
     ) {
       setIsPaused(false);
-      if (isVisible) videoRef.current?.playAsync();
     }
   };
 
@@ -1323,25 +1358,41 @@ const InstagramVideo = ({
               onHandlerStateChange={onSingleTapHandler}
             >
               <View style={StyleSheet.absoluteFill}>
-                <Video
-                  ref={videoRef}
-                  style={styles.media}
-                  source={source}
-                  resizeMode={ResizeMode.COVER}
-                  isLooping
-                  isMuted={isMuted}
-                  shouldPlay={isVisible && !isPaused}
-                  usePoster={true}
-                  posterSource={posterSource}
-                  posterStyle={{ resizeMode: 'cover' }}
-                  onReadyForDisplay={(event) => {
-                    if (onAspectRatio) {
-                      const ratio = event.naturalSize.width / event.naturalSize.height;
-                      onAspectRatio(ratio);
-                    }
-                  }}
-                  onError={(e) => console.log("Video Error:", e)}
-                />
+                {showVideo ? (
+                  <Video
+                    ref={videoRef}
+                    style={styles.media}
+                    source={source}
+                    resizeMode={ResizeMode.COVER}
+                    isLooping
+                    isMuted={isMuted}
+                    shouldPlay={true} // Controlled by mounting + playAsync in effect
+                    usePoster={true}
+                    posterSource={thumbnail}
+                    posterStyle={{ resizeMode: 'cover' }}
+                    onReadyForDisplay={(event) => {
+                      if (onAspectRatio) {
+                        const ratio = event.naturalSize.width / event.naturalSize.height;
+                        onAspectRatio(ratio);
+                      }
+                    }}
+                    onError={(e) => console.log("Video Error:", e)}
+                  />
+                ) : (
+                  <View style={StyleSheet.absoluteFill}>
+                    <Image
+                      source={thumbnail || { uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=' }} // Transparent placeholder
+                      style={styles.media}
+                      resizeMode="cover"
+                    />
+                    {/* Play Icon Overlay for Thumbnails */}
+                    <View style={styles.videoOverlay}>
+                      <View style={[styles.pauseIconContainer, { backgroundColor: 'rgba(0,0,0,0.3)', width: 48, height: 48 }]}>
+                        <Play size={24} color={COLORS.background} fill={COLORS.background} style={{ marginLeft: 2 }} />
+                      </View>
+                    </View>
+                  </View>
+                )}
 
                 {/* Hold to Pause Indicator */}
                 {isPaused && (
