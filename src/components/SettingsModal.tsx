@@ -353,11 +353,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 24,
     elevation: 5,
+    maxHeight: '90%',
     padding: 24,
     shadowColor: '#000',
     shadowOpacity: 0.1,
-    shadowRadius: 10,
-    maxHeight: '90%', // Ensure it fits on screen
+    shadowRadius: 10, // Ensure it fits on screen
   },
   container: {
     flex: 1,
@@ -391,8 +391,8 @@ const styles = StyleSheet.create({
   emptyLogs: {
     color: '#9ca3af',
     fontStyle: 'italic',
-    textAlign: 'center',
     marginTop: 20,
+    textAlign: 'center',
   },
   header: {
     alignItems: 'center',
@@ -451,8 +451,8 @@ const styles = StyleSheet.create({
   logItemError: {
     backgroundColor: '#fef2f2',
     borderColor: '#fca5a5',
-    borderWidth: 1,
     borderRadius: 8,
+    borderWidth: 1,
     padding: 8,
   },
   logLevel: {
