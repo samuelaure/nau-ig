@@ -113,7 +113,7 @@ export const TagPickerModal: React.FC<TagPickerModalProps> = ({
                                     {isSelected ? (
                                         <CheckSquare size={18} color={COLORS.primary} />
                                     ) : (
-                                        <Square size={18} color={COLORS.textSecondary} />
+                                        <Square size={18} color="#000" />
                                     )}
                                     <Text
                                         style={[

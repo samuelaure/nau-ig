@@ -90,6 +90,20 @@ class SyncManager {
         try {
           const result = await ApifyService.scrapPost(post.instagramUrl, apifyToken);
 
+          if (result.status === 'restricted') {
+            console.log(`[SyncManager] Restricted content for post ${post.id}`);
+            // We update with what we have (caption/title) and set status to restricted
+            // We pass empty media array but valid other data.
+            await updatePostMedia(post.id, {
+              mediaData: [],
+              instagram_caption: result.instagram_caption,
+            });
+            // Override status to restricted
+            await updateSyncStatus(post.id, 'restricted');
+            this.notify();
+            continue;
+          }
+
           if (result.status === 'success' && result.mediaItems) {
             const username = result.username || 'instagram_user';
 

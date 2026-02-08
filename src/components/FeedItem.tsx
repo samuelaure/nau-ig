@@ -151,7 +151,12 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
         } catch (e) { }
       }
 
-      if (!post.mediaData || post.isProcessed === 0) {
+      if (post.sync_status === 'restricted') {
+        setLoading(false);
+        return;
+      }
+
+      if (!post.mediaData) {
         setLoading(false);
         return;
       }
@@ -454,7 +459,29 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
       {/* 2. Media Carousel (Only for IG links) */}
       {!isSimpleNote && (
         <View style={styles.mediaWrapper}>
-          {post.isProcessed === 0 ? (
+          {post.sync_status === 'restricted' ? (
+            <View style={[styles.mediaPlaceholder, styles.errorBox]}>
+              <EyeOff size={48} color={COLORS.error} />
+              <Text style={[styles.errorText, { marginTop: 12, color: COLORS.error }]}>Restricted Content</Text>
+              <Text style={{ color: '#64748b', fontSize: 13, marginTop: 6, textAlign: 'center', paddingHorizontal: 40 }}>
+                This post cannot be downloaded due to Instagram privacy settings.
+              </Text>
+              <TouchableOpacity
+                style={{
+                  marginTop: 20,
+                  backgroundColor: '#fef2f2',
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: '#fee2e2'
+                }}
+                onPress={handleDelete}
+              >
+                <Text style={{ color: COLORS.error, fontWeight: '700' }}>Delete Capture</Text>
+              </TouchableOpacity>
+            </View>
+          ) : post.isProcessed === 0 && (!post.mediaData || post.mediaData === '[]') ? (
             <Animated.View
               style={[styles.mediaPlaceholder, styles.processingBox, { opacity: pulseAnim }]}
             >
@@ -494,6 +521,14 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
                       ]}
                     />
                   ))}
+                </View>
+              )}
+              {post.isProcessed === 0 && (
+                <View style={styles.syncOverlay}>
+                  <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', padding: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <ActivityIndicator size="small" color="#fff" />
+                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Refreshing...</Text>
+                  </View>
                 </View>
               )}
             </View>
@@ -946,6 +981,12 @@ const styles = StyleSheet.create({
   paginationDotActive: {
     backgroundColor: COLORS.secondary,
     width: 8,
+  },
+  syncOverlay: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    zIndex: 10,
   },
   // --- 3. Review Bar (16px) ---
   reviewBar: {

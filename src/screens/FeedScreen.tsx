@@ -282,94 +282,96 @@ export const FeedScreen = () => {
         </View>
 
         <View style={styles.sidebarContent}>
-          <TouchableOpacity
-            style={[styles.sidebarItem, activeTab === 'due' && styles.sidebarItemActive]}
-            onPress={() => handleTabChange('due')}
-          >
-            <LayoutGrid size={22} color={activeTab === 'due' ? COLORS.secondary : '#4b5563'} />
-            <Text
-              style={[
-                styles.sidebarItemText,
-                activeTab === 'due' && { color: COLORS.secondary, fontWeight: '800' },
-              ]}
-            >
-              To Review
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.sidebarItem, activeTab === 'reviewed' && styles.sidebarItemActive]}
-            onPress={() => handleTabChange('reviewed')}
-          >
-            <Clock size={22} color={activeTab === 'reviewed' ? COLORS.secondary : '#4b5563'} />
-            <Text
-              style={[
-                styles.sidebarItemText,
-                activeTab === 'reviewed' && { color: COLORS.secondary, fontWeight: '800' },
-              ]}
-            >
-              History
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.sidebarItem, activeTab === 'unscheduled' && styles.sidebarItemActive]}
-            onPress={() => handleTabChange('unscheduled')}
-          >
-            <Archive size={22} color={activeTab === 'unscheduled' ? COLORS.secondary : '#4b5563'} />
-            <Text
-              style={[
-                styles.sidebarItemText,
-                activeTab === 'unscheduled' && { color: COLORS.secondary, fontWeight: '800' },
-              ]}
-            >
-              Archive
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.sidebarDivider} />
-          <View style={styles.sidebarSectionHeader}>
-            <Text style={styles.sidebarSectionTitle}>LABELS</Text>
-          </View>
-
-          {labels.map((label) => (
+          <ScrollView contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
             <TouchableOpacity
-              key={label.id}
-              style={[
-                styles.sidebarItem,
-                activeTab === 'label' && selectedTag === label.name && styles.sidebarItemActive,
-              ]}
-              onPress={() => handleLabelSelect(label.name)}
+              style={[styles.sidebarItem, activeTab === 'due' && styles.sidebarItemActive]}
+              onPress={() => handleTabChange('due')}
             >
-              <TagIcon
-                size={22}
-                color={
-                  activeTab === 'label' && selectedTag === label.name ? COLORS.secondary : '#4b5563'
-                }
-              />
+              <LayoutGrid size={22} color={activeTab === 'due' ? COLORS.secondary : '#4b5563'} />
               <Text
                 style={[
                   styles.sidebarItemText,
-                  activeTab === 'label' &&
-                  selectedTag === label.name && { color: COLORS.secondary, fontWeight: '800' },
+                  activeTab === 'due' && { color: COLORS.secondary, fontWeight: '800' },
                 ]}
               >
-                {label.name}
+                To Review
               </Text>
             </TouchableOpacity>
-          ))}
 
-          <TouchableOpacity
-            style={styles.sidebarItem}
-            onPress={() => {
-              setLabelsModalVisible(true);
-              toggleSidebar();
-            }}
-          >
-            <Pencil size={22} color="#4b5563" />
-            <Text style={styles.sidebarItemText}>Edit labels</Text>
-          </TouchableOpacity>
-          <View style={styles.sidebarDivider} />
+            <TouchableOpacity
+              style={[styles.sidebarItem, activeTab === 'reviewed' && styles.sidebarItemActive]}
+              onPress={() => handleTabChange('reviewed')}
+            >
+              <Clock size={22} color={activeTab === 'reviewed' ? COLORS.secondary : '#4b5563'} />
+              <Text
+                style={[
+                  styles.sidebarItemText,
+                  activeTab === 'reviewed' && { color: COLORS.secondary, fontWeight: '800' },
+                ]}
+              >
+                History
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.sidebarItem, activeTab === 'unscheduled' && styles.sidebarItemActive]}
+              onPress={() => handleTabChange('unscheduled')}
+            >
+              <Archive size={22} color={activeTab === 'unscheduled' ? COLORS.secondary : '#4b5563'} />
+              <Text
+                style={[
+                  styles.sidebarItemText,
+                  activeTab === 'unscheduled' && { color: COLORS.secondary, fontWeight: '800' },
+                ]}
+              >
+                Archive
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.sidebarDivider} />
+            <View style={styles.sidebarSectionHeader}>
+              <Text style={styles.sidebarSectionTitle}>LABELS</Text>
+            </View>
+
+            {labels.map((label) => (
+              <TouchableOpacity
+                key={label.id}
+                style={[
+                  styles.sidebarItem,
+                  activeTab === 'label' && selectedTag === label.name && styles.sidebarItemActive,
+                ]}
+                onPress={() => handleLabelSelect(label.name)}
+              >
+                <TagIcon
+                  size={22}
+                  color={
+                    activeTab === 'label' && selectedTag === label.name ? COLORS.secondary : '#4b5563'
+                  }
+                />
+                <Text
+                  style={[
+                    styles.sidebarItemText,
+                    activeTab === 'label' &&
+                    selectedTag === label.name && { color: COLORS.secondary, fontWeight: '800' },
+                  ]}
+                >
+                  {label.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity
+              style={styles.sidebarItem}
+              onPress={() => {
+                setLabelsModalVisible(true);
+                toggleSidebar();
+              }}
+            >
+              <Pencil size={22} color="#4b5563" />
+              <Text style={styles.sidebarItemText}>Edit labels</Text>
+            </TouchableOpacity>
+            <View style={styles.sidebarDivider} />
+          </ScrollView>
         </View>
 
         <View style={styles.sidebarFooter}>

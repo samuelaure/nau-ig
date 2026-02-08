@@ -1,7 +1,7 @@
 import { MediaItem } from '@/repositories/PostRepository';
 
 export interface ApifyScrapResult {
-  status: 'success' | 'error';
+  status: 'success' | 'error' | 'restricted';
   username?: string;
   instagram_user_id?: string;
   profile_image?: string;
@@ -57,6 +57,13 @@ export class ApifyService {
       }
 
       const item = items[0];
+
+      if (item.error === 'restricted_page') {
+        return {
+          status: 'restricted',
+          instagram_caption: item.caption || item.title || item.description || 'Restricted Content',
+        };
+      }
 
       // Map Apify fields to our internal structure
       const mediaItems: MediaItem[] = [];

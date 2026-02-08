@@ -9,8 +9,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ScrollView,
+  FlatList,
 } from 'react-native';
-import { X, Globe, Database, Trash2, RefreshCcw, Clock } from 'lucide-react-native';
+import { X, Globe, Database, Trash2, RefreshCcw, Clock, FileText, Bug } from 'lucide-react-native';
 import { getSetting, setSetting } from '@/repositories/SettingsRepository';
 import { getStandbyPosts, resetSyncForManualRetry } from '@/repositories/PostRepository';
 import { SYNC_POLLING_INTERVAL, COLORS } from '@/constants';
@@ -18,6 +20,7 @@ import { DEFAULT_FREQUENCY_CHAIN } from '@/services/FrequencyService';
 import { syncManager } from '@/services/SyncManager';
 import { MediaCacheService } from '@/services/MediaCacheService';
 import { BackupService } from '@/services/BackupService';
+import { logger } from '@/services/LogService';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -31,6 +34,8 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
   const [isRecovering, setIsRecovering] = useState(false);
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [standbyCount, setStandbyCount] = useState(0);
+  const [showLogs, setShowLogs] = useState(false);
+  const [logs, setLogs] = useState(logger.getLogs());
 
   const loadStandbyCount = async () => {
     try {
@@ -48,6 +53,15 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
       loadStandbyCount();
     }
   }, [visible]);
+
+  useEffect(() => {
+    if (showLogs) {
+      const unsubscribe = logger.subscribe(() => {
+        setLogs([...logger.getLogs()]);
+      });
+      return unsubscribe;
+    }
+  }, [showLogs]);
 
   const handleSave = async () => {
     await setSetting('apify_api_token', apifyToken);
@@ -89,9 +103,8 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
       const currentToken = await getSetting('apify_api_token');
       if (!currentToken) throw new Error('Apify API Token not configured');
 
-      console.log(`[Recovery] Querying Apify for ${standbyPosts.length} standby items...`);
+      logger.log(`[Recovery] Querying Apify for ${standbyPosts.length} standby items...`);
 
-      // TODO: Update this to use ApifyService once implemented
       setStandbyCount(standbyPosts.length);
 
       let recovered = 0;
@@ -99,8 +112,6 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
 
       for (const p of standbyPosts) {
         try {
-          // We reset the status to pending and sync attempts to 0,
-          // then let the syncManager do its work or we call process directly.
           await resetSyncForManualRetry([p.id]);
           recovered++;
         } catch (e) {
@@ -108,7 +119,6 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
         }
       }
 
-      // Wake up the background sync manager to process the restarted tasks
       syncManager.triggerSync();
 
       Alert.alert(
@@ -132,6 +142,44 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
     }
   };
 
+  if (showLogs) {
+    return (
+      <Modal visible={visible} animationType="slide" transparent onRequestClose={() => setShowLogs(false)}>
+        <View style={styles.overlay}>
+          <View style={[styles.container, styles.card, { padding: 0 }]}>
+            <View style={[styles.header, { padding: 20, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }]}>
+              <Text style={styles.title}>System Logs</Text>
+              <View style={{ flexDirection: 'row', gap: 15 }}>
+                <TouchableOpacity onPress={() => logger.clear()}>
+                  <Trash2 size={20} color={COLORS.error} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setShowLogs(false)}>
+                  <X size={24} color={COLORS.dark} />
+                </TouchableOpacity>
+              </View>
+            </View>
+            <FlatList
+              data={logs}
+              keyExtractor={(_, index) => index.toString()}
+              contentContainerStyle={{ padding: 20 }}
+              renderItem={({ item }) => (
+                <View style={[styles.logItem, item.level === 'error' && styles.logItemError]}>
+                  <Text style={styles.logTime}>{new Date(item.timestamp).toLocaleTimeString()}</Text>
+                  <Text style={[styles.logLevel, item.level === 'error' && { color: COLORS.error }]}>{item.level.toUpperCase()}</Text>
+                  <Text style={styles.logMessage}>{item.message}</Text>
+                  {item.data && (
+                    <Text style={styles.logData}>{JSON.stringify(item.data, null, 2)}</Text>
+                  )}
+                </View>
+              )}
+              ListEmptyComponent={<Text style={styles.emptyLogs}>No logs recorded yet.</Text>}
+            />
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -147,112 +195,124 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.content}>
-              {/* API Settings */}
-              <Text style={styles.label}>Apify API Token</Text>
-              <View style={styles.inputContainer}>
-                <Globe size={18} color={COLORS.textSecondary} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="apify_api_..."
-                  value={apifyToken}
-                  onChangeText={setApifyToken}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  secureTextEntry
-                />
-              </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+              <View style={styles.content}>
+                {/* API Settings */}
+                <Text style={styles.label}>Apify API Token</Text>
+                <View style={styles.inputContainer}>
+                  <Globe size={18} color={COLORS.textSecondary} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="apify_api_..."
+                    value={apifyToken}
+                    onChangeText={setApifyToken}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    secureTextEntry
+                  />
+                </View>
 
-              <View style={styles.sectionDivider} />
-              <Text style={styles.label}>Frequency Levels Chain</Text>
-              <View style={[styles.inputContainer, styles.textAreaContainer]}>
-                <Clock size={18} color={COLORS.textSecondary} style={[styles.inputIcon, { marginTop: 12 }]} />
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="1 day, 2 days, 1 week..."
-                  value={frequencyChain}
-                  onChangeText={setFrequencyChain}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-              <Text style={styles.helpText}>
-                Define the levels for "More" and "Less" buttons. Must be in increasing order.
-                Units: days, weeks, months, years.
-              </Text>
-
-              {/* Storage Settings */}
-              <View style={styles.sectionDivider} />
-              <Text style={styles.label}>Media Management</Text>
-              <TouchableOpacity
-                style={styles.dangerActionBtn}
-                onPress={handleClearCache}
-                disabled={isClearing}
-              >
-                <Database size={18} color={COLORS.error} style={styles.inputIcon} />
-                <Text style={styles.dangerActionText}>
-                  {isClearing ? 'Clearing...' : 'Clear Media Cache'}
+                <View style={styles.sectionDivider} />
+                <Text style={styles.label}>Frequency Levels Chain</Text>
+                <View style={[styles.inputContainer, styles.textAreaContainer]}>
+                  <Clock size={18} color={COLORS.textSecondary} style={[styles.inputIcon, { marginTop: 12 }]} />
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    placeholder="1 day, 2 days, 1 week..."
+                    value={frequencyChain}
+                    onChangeText={setFrequencyChain}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+                <Text style={styles.helpText}>
+                  Define the levels for "More" and "Less" buttons. Must be in increasing order.
+                  Units: days, weeks, months, years.
                 </Text>
-                <Trash2 size={16} color={COLORS.error} style={{ marginLeft: 'auto' }} />
-              </TouchableOpacity>
-              <Text style={styles.helpText}>
-                Clearing the cache frees up local storage. Media is automatically re-downloaded when
-                needed.
-              </Text>
 
-              {/* Sync Recovery */}
-              <View style={styles.sectionDivider} />
-              <View style={styles.labelRow}>
-                <Text style={styles.label}>Sync Recovery</Text>
-                {standbyCount > 0 && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{standbyCount}</Text>
-                  </View>
-                )}
+                {/* Storage Settings */}
+                <View style={styles.sectionDivider} />
+                <Text style={styles.label}>Media Management</Text>
+                <TouchableOpacity
+                  style={styles.dangerActionBtn}
+                  onPress={handleClearCache}
+                  disabled={isClearing}
+                >
+                  <Database size={18} color={COLORS.error} style={styles.inputIcon} />
+                  <Text style={styles.dangerActionText}>
+                    {isClearing ? 'Clearing...' : 'Clear Media Cache'}
+                  </Text>
+                  <Trash2 size={16} color={COLORS.error} style={{ marginLeft: 'auto' }} />
+                </TouchableOpacity>
+                <Text style={styles.helpText}>
+                  Clearing the cache frees up local storage. Media is automatically re-downloaded when
+                  needed.
+                </Text>
+
+                {/* Sync Recovery */}
+                <View style={styles.sectionDivider} />
+                <View style={styles.labelRow}>
+                  <Text style={styles.label}>Sync Recovery</Text>
+                  {standbyCount > 0 && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{standbyCount}</Text>
+                    </View>
+                  )}
+                </View>
+                <TouchableOpacity
+                  style={[styles.actionBtn, standbyCount === 0 && styles.disabledBtn]}
+                  onPress={handleManualRecovery}
+                  disabled={isRecovering || standbyCount === 0}
+                >
+                  <RefreshCcw
+                    size={18}
+                    color={standbyCount > 0 ? COLORS.secondary : COLORS.textSecondary}
+                    style={[styles.inputIcon, isRecovering && styles.rotate]}
+                  />
+                  <Text style={[styles.actionBtnText, standbyCount === 0 && styles.disabledText]}>
+                    {isRecovering ? 'Processing...' : 'Retry Standby Captures'}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={styles.helpText}>
+                  {standbyCount > 0
+                    ? `There are ${standbyCount} captures in standby after failing to process. Tap to retry them.`
+                    : 'All captures are processing normally or are fully synced. Manual recovery can fix stuck processing tasks.'}
+                </Text>
+
+                {/* Data Management */}
+                <View style={styles.sectionDivider} />
+                <Text style={styles.label}>Data Management</Text>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={handleBackup}
+                  disabled={isBackingUp}
+                >
+                  <Database size={18} color={COLORS.primary} style={styles.inputIcon} />
+                  <Text style={styles.actionBtnText}>
+                    {isBackingUp ? 'Exporting...' : 'Backup Data'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Logs */}
+                <View style={styles.sectionDivider} />
+                <Text style={styles.label}>Debugging</Text>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => setShowLogs(true)}
+                >
+                  <Bug size={18} color={COLORS.textSecondary} style={styles.inputIcon} />
+                  <Text style={[styles.actionBtnText, { color: COLORS.textSecondary }]}>
+                    View System Logs
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={styles.sectionDivider} />
+
+                <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+                  <Text style={styles.saveBtnText}>Save Settings</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={[styles.actionBtn, standbyCount === 0 && styles.disabledBtn]}
-                onPress={handleManualRecovery}
-                disabled={isRecovering || standbyCount === 0}
-              >
-                <RefreshCcw
-                  size={18}
-                  color={standbyCount > 0 ? COLORS.secondary : COLORS.textSecondary}
-                  style={[styles.inputIcon, isRecovering && styles.rotate]}
-                />
-                <Text style={[styles.actionBtnText, standbyCount === 0 && styles.disabledText]}>
-                  {isRecovering ? 'Processing...' : 'Retry Standby Captures'}
-                </Text>
-              </TouchableOpacity>
-              <Text style={styles.helpText}>
-                {standbyCount > 0
-                  ? `There are ${standbyCount} captures in standby after failing to process. Tap to retry them.`
-                  : 'All captures are processing normally or are fully synced.'}
-              </Text>
-
-              {/* Data Management */}
-              <View style={styles.sectionDivider} />
-              <Text style={styles.label}>Data Management</Text>
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={handleBackup}
-                disabled={isBackingUp}
-              >
-                <Database size={18} color={COLORS.primary} style={styles.inputIcon} />
-                <Text style={styles.actionBtnText}>
-                  {isBackingUp ? 'Exporting...' : 'Backup Data'}
-                </Text>
-              </TouchableOpacity>
-              <Text style={styles.helpText}>
-                Export a copy of your database to save securely or transfer to another device.
-              </Text>
-
-              <View style={styles.sectionDivider} />
-
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                <Text style={styles.saveBtnText}>Save Settings</Text>
-              </TouchableOpacity>
-            </View>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -297,6 +357,7 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOpacity: 0.1,
     shadowRadius: 10,
+    maxHeight: '90%', // Ensure it fits on screen
   },
   container: {
     flex: 1,
@@ -326,6 +387,12 @@ const styles = StyleSheet.create({
   },
   disabledText: {
     color: '#9ca3af',
+  },
+  emptyLogs: {
+    color: '#9ca3af',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 20,
   },
   header: {
     alignItems: 'center',
@@ -365,6 +432,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
+  },
+  logData: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 4,
+    color: '#475569',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 10,
+    marginTop: 4,
+    padding: 4,
+  },
+  logItem: {
+    borderBottomColor: '#f1f5f9',
+    borderBottomWidth: 1,
+    marginBottom: 8,
+    paddingBottom: 8,
+  },
+  logItemError: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fca5a5',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 8,
+  },
+  logLevel: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  logMessage: {
+    color: '#1e293b',
+    fontSize: 13,
+  },
+  logTime: {
+    color: '#94a3b8',
+    fontSize: 10,
+    marginBottom: 2,
   },
   overlay: {
     backgroundColor: COLORS.overlay,

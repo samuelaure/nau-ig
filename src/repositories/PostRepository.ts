@@ -20,7 +20,7 @@ export interface Post {
   sm2_ease_factor: number;
   frequency: string;
   sync_attempts: number;
-  sync_status: 'pending' | 'processed' | 'standby';
+  sync_status: 'pending' | 'processed' | 'standby' | 'restricted';
   username?: string;
   profile_image?: string;
   instagram_caption?: string;
@@ -116,7 +116,7 @@ export const incrementSyncAttempts = async (id: number): Promise<void> => {
 
 export const updateSyncStatus = async (
   id: number,
-  status: 'pending' | 'standby' | 'processed',
+  status: 'pending' | 'standby' | 'processed' | 'restricted',
 ): Promise<void> => {
   await runSql('UPDATE posts SET sync_status = ? WHERE id = ?', [status, id]);
 };
@@ -135,8 +135,7 @@ export const resetPostForRedownload = async (id: number): Promise<void> => {
     `UPDATE posts 
      SET isProcessed = 0, 
          sync_status = 'pending', 
-         sync_attempts = 0, 
-         mediaData = NULL 
+         sync_attempts = 0
      WHERE id = ?`,
     [id],
   );
