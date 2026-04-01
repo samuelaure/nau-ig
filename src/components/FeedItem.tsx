@@ -173,15 +173,27 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
           }),
         );
 
-        if (isMounted.current) {
-          setMedia(cachedData);
+        let initialRatio = 1;
+        if (cachedData.length > 0) {
+          const firstItem = cachedData[0];
+          const uriToCheck = firstItem.type === 'video'
+            ? (firstItem.localThumbnailUri || firstItem.thumbnail)
+            : (firstItem.localUri || firstItem.url);
 
-          // Try to get aspect ratio for the first item if it's an image
-          if (cachedData.length > 0 && cachedData[0].type === 'image') {
-            Image.getSize(cachedData[0].localUri || cachedData[0].url, (w, h) => {
-              if (isMounted.current && w && h) setMediaAspectRatio(w / h);
+          if (uriToCheck) {
+            initialRatio = await new Promise<number>((resolve) => {
+              Image.getSize(
+                uriToCheck,
+                (w, h) => resolve(w && h ? w / h : 1),
+                () => resolve(1)
+              );
             });
           }
+        }
+
+        if (isMounted.current) {
+          if (initialRatio !== 1) setMediaAspectRatio(initialRatio);
+          setMedia(cachedData);
         }
       } catch (e) {
         console.error('JSON Parse error for post media', e);
@@ -358,7 +370,7 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
           posterSource={posterSource}
           isVisible={isVisible && index === activeMediaIndex}
           onAspectRatio={(ratio) => {
-            if (mediaAspectRatio === 1) setMediaAspectRatio(ratio);
+            if (Math.abs(mediaAspectRatio - ratio) > 0.05) setMediaAspectRatio(ratio);
           }}
           aspectRatio={mediaAspectRatio}
           onDoubleTap={handleReviewed}
@@ -461,9 +473,8 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
           {post.sync_status === 'restricted' ? (
             <View style={[styles.mediaPlaceholder, styles.errorBox]}>
               <EyeOff size={48} color={COLORS.error} />
-              <Text style={[styles.errorText, { marginTop: 12, color: COLORS.error }]}>Restricted Content</Text>
-              <Text style={{ color: '#64748b', fontSize: 13, marginTop: 6, textAlign: 'center', paddingHorizontal: 40 }}>
-                This post cannot be downloaded due to Instagram privacy settings.
+              <Text style={{ color: '#64748b', fontSize: 13, marginTop: 12, textAlign: 'center', paddingHorizontal: 40, lineHeight: 20 }}>
+                <Text style={{ color: COLORS.error, fontWeight: 'bold' }}>Restricted Content</Text> - This post cannot be downloaded due to Instagram privacy settings.
               </Text>
               <TouchableOpacity
                 style={{

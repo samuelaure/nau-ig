@@ -41,7 +41,7 @@ export const getDuePosts = async (tagFilter?: string | null, limit = 20, offset 
     params.push(`%${tagFilter}%`);
   }
 
-  query += ` ORDER BY next_review_at ASC LIMIT ? OFFSET ?`;
+  query += ` ORDER BY id DESC LIMIT ? OFFSET ?`;
   params.push(limit, offset);
   return executeSql<Post>(query, params);
 };
@@ -76,7 +76,7 @@ export const getUnscheduledPosts = async (tagFilter?: string | null, limit = 20,
 
 export const getPostsByTag = async (tag: string, limit = 20, offset = 0): Promise<Post[]> => {
   return executeSql<Post>(
-    "SELECT * FROM posts WHERE is_deleted = 0 AND tags LIKE ? ORDER BY next_review_at ASC LIMIT ? OFFSET ?",
+    "SELECT * FROM posts WHERE is_deleted = 0 AND tags LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?",
     [`%${tag}%`, limit, offset]
   );
 };
