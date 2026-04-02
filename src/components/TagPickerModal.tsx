@@ -14,6 +14,7 @@ import {
     CheckSquare,
 } from 'lucide-react-native';
 import { getAllLabels, createLabel } from '@/repositories/LabelRepository';
+import { getRecentTags } from '@/repositories/PostRepository';
 import { COLORS } from '@/constants';
 
 interface TagPickerModalProps {
@@ -31,6 +32,7 @@ export const TagPickerModal: React.FC<TagPickerModalProps> = ({
 }) => {
     const [newTag, setNewTag] = useState('');
     const [existingTags, setExistingTags] = useState<string[]>([]);
+    const [recentTags, setRecentTags] = useState<string[]>([]);
 
     useEffect(() => {
         if (visible) {
@@ -39,8 +41,12 @@ export const TagPickerModal: React.FC<TagPickerModalProps> = ({
     }, [visible]);
 
     const loadData = async () => {
-        const labels = await getAllLabels();
+        const [labels, recents] = await Promise.all([
+            getAllLabels(),
+            getRecentTags(6)
+        ]);
         setExistingTags(labels.map((l) => l.name));
+        setRecentTags(recents);
     };
 
     const toggleTag = (tag: string) => {
@@ -73,6 +79,31 @@ export const TagPickerModal: React.FC<TagPickerModalProps> = ({
         t.toLowerCase().includes(newTag.toLowerCase())
     );
 
+    const renderTagItem = (key: string, tag: string) => {
+        const isSelected = selectedTags.includes(tag);
+        return (
+            <TouchableOpacity
+                key={key}
+                style={styles.popupItem}
+                onPress={() => toggleTag(tag)}
+            >
+                {isSelected ? (
+                    <CheckSquare size={18} color={COLORS.primary} />
+                ) : (
+                    <Square size={18} color="#9ca3af" />
+                )}
+                <Text
+                    style={[
+                        styles.popupItemText,
+                        isSelected && styles.popupItemTextActive,
+                    ]}
+                >
+                    {tag}
+                </Text>
+            </TouchableOpacity>
+        );
+    };
+
     return (
         <Modal
             visible={visible}
@@ -102,30 +133,29 @@ export const TagPickerModal: React.FC<TagPickerModalProps> = ({
                         style={styles.popupList}
                         keyboardShouldPersistTaps="handled"
                     >
-                        {filteredTags.map((tag) => {
-                            const isSelected = selectedTags.includes(tag);
-                            return (
-                                <TouchableOpacity
-                                    key={tag}
-                                    style={styles.popupItem}
-                                    onPress={() => toggleTag(tag)}
-                                >
-                                    {isSelected ? (
-                                        <CheckSquare size={18} color={COLORS.primary} />
-                                    ) : (
-                                        <Square size={18} color="#000" />
-                                    )}
-                                    <Text
-                                        style={[
-                                            styles.popupItemText,
-                                            isSelected && styles.popupItemTextActive,
-                                        ]}
-                                    >
-                                        {tag}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
+                        {newTag ? (
+                            filteredTags.map((tag) => renderTagItem(tag, tag))
+                        ) : (
+                            <>
+                                {recentTags.length > 0 && (
+                                    <>
+                                        <View style={styles.sectionHeader}>
+                                            <Text style={styles.sectionTitle}>Recent</Text>
+                                        </View>
+                                        {recentTags.map((tag) => renderTagItem(`recent_${tag}`, tag))}
+                                    </>
+                                )}
+                                
+                                {existingTags.length > 0 && (
+                                    <>
+                                        <View style={styles.sectionHeader}>
+                                            <Text style={styles.sectionTitle}>All Tags</Text>
+                                        </View>
+                                        {existingTags.map((tag) => renderTagItem(`all_${tag}`, tag))}
+                                    </>
+                                )}
+                            </>
+                        )}
                     </ScrollView>
                     <TouchableOpacity
                         style={[styles.doneBtn, { marginTop: 12 }]}
@@ -201,5 +231,17 @@ const styles = StyleSheet.create({
     },
     popupList: {
         maxHeight: 200,
+    },
+    sectionHeader: {
+        paddingHorizontal: 4,
+        paddingTop: 12,
+        paddingBottom: 6,
+    },
+    sectionTitle: {
+        color: '#9ca3af',
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
     },
 });

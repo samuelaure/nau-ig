@@ -7,7 +7,7 @@ export interface Label {
 }
 
 export const getAllLabels = async (): Promise<Label[]> => {
-    return executeSql<Label>('SELECT * FROM labels ORDER BY name ASC');
+    return executeSql<Label>('SELECT * FROM labels ORDER BY name COLLATE NOCASE ASC');
 };
 
 export const createLabel = async (name: string): Promise<number> => {

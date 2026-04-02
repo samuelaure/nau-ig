@@ -147,7 +147,7 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
     const prepareMedia = async () => {
       if (post.tags) {
         try {
-          setTags(JSON.parse(post.tags).sort());
+          setTags(JSON.parse(post.tags).sort((a: string, b: string) => a.toLowerCase().localeCompare(b.toLowerCase())));
         } catch (e) { }
       }
 
@@ -282,7 +282,7 @@ export const FeedItem = React.memo(({ post, onProcessed, onUpdate, onRemove, isH
   };
 
   const handleUpdateTags = async (newTags: string[]) => {
-    setTags(newTags.sort()); // Optimistic update
+    setTags(newTags.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))); // Optimistic update
     try {
       await updatePostTags(post.id, newTags);
       if (onUpdate) {

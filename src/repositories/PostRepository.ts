@@ -98,7 +98,35 @@ export const getAllTags = async (): Promise<string[]> => {
         /* ignore parse errors */
       }
     });
-    return Array.from(allTags).sort();
+    return Array.from(allTags).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+  } catch (err) {
+    return [];
+  }
+};
+
+/**
+ * Fetches the most recently used tags from the most recent posts.
+ */
+export const getRecentTags = async (limit = 6): Promise<string[]> => {
+  try {
+    const rows = await executeSql<{ tags: string }>(
+      'SELECT tags FROM posts WHERE tags IS NOT NULL AND is_deleted = 0 AND tags != "[]" AND tags != "" ORDER BY id DESC LIMIT 50'
+    );
+    const recentTags = new Set<string>();
+    for (const row of rows) {
+      try {
+        const tags: string[] = JSON.parse(row.tags);
+        for (const t of tags) {
+          recentTags.add(t);
+          if (recentTags.size >= limit) {
+            return Array.from(recentTags);
+          }
+        }
+      } catch (e) {
+        /* ignore parse errors */
+      }
+    }
+    return Array.from(recentTags);
   } catch (err) {
     return [];
   }
