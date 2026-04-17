@@ -1,4 +1,8 @@
-# NAU-IG 📸
+# NAU-IG (DEPRECATED & ABSORBED BY 9naŭ Mobile)
+
+> [!WARNING]
+> **This repository is DEPRECATED and has been absorbed by [9naŭ Mobile](https://github.com/SamuelAure/9nau).**  
+> The Instagram capture engine, media vault, and sync logic have been integrated into the unified Expo/React Native mobile application within the 9naŭ monorepo.
 
 A powerful Instagram content capture and management tool built with Expo and Sparkly Space Repetition.
 
